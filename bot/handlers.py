@@ -81,13 +81,20 @@ async def handle_text(message: types.Message):
 
     # --- QO'SHISH ---
     elif cmd == 'batch_add':
-        # Qo'shish ruxsati bormi? (Buni alohida tekshiramiz)
+        # 1. Ruxsat tekshirish
         if db_user.get('can_add') == 0:
-            await status_msg.edit_text("🚫 **Sizda qoldiq qo'shish huquqi yo'q.** faqat qidira olasiz.")
+            await status_msg.edit_text("🚫 **Sizda qoldiq qo'shish huquqi yo'q.**")
             return
 
         items = ai_result.get('items', [])
-        report = "💾 **Saqlandi:**\n"
+        
+        # --- YANGI QO'SHILGAN TEKSHIRUV ---
+        if not items:
+            await status_msg.edit_text("🤷‍♂️ **Buyruq tushunarsiz.**\nAI 'qo'shish' kerakligini tushundi, lekin o'lcham va materialni ajrata olmadi.\n\nIltimos, aniqroq yozing.\n*Masalan: Oq dsp 500x300 2 dona*")
+            return
+        # ----------------------------------
+
+        report = "💾 **Qoldiqlar saqlandi:**\n\n"
         
         for item in items:
             new_id = db.add_remnant(
