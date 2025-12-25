@@ -7,7 +7,7 @@ import database.queries as db
 router = Router()
 
 # Admin Username (Userlar bog'lanishi uchun)
-ADMIN_USERNAME = "@SizningUsername" # <-- SHU YERGA O'ZINGIZNIKINI YOZING
+ADMIN_USERNAME = "@iRealBy_3d" # <-- SHU YERGA O'ZINGIZNIKINI YOZING
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
