@@ -1,146 +1,58 @@
 from database.connection import get_db_connection
-from services.utils import normalize_text
 
-# --- 1. QO'SHISH (ADD) ---
 def add_remnant(category, material, width, height, qty, order, location, user_id, user_name):
     conn = get_db_connection()
-    if not conn: 
-        print("❌ Bazaga ulanib bo'lmadi!")
-        return None
-    
+    if not conn: return None
     cursor = conn.cursor()
-    clean_mat = normalize_text(material)
-    clean_cat = normalize_text(category)
-    
     try:
-        query = """
-        INSERT INTO remnants 
-        (category, material, width, height, qty, origin_order, location, created_by_user_id, created_by_name)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id;
-        """
-        cursor.execute(query, (clean_cat, clean_mat, width, height, qty, order, location, user_id, user_name))
-        
-        row = cursor.fetchone() # Natijani olamiz
-        new_id = row['id']
-        
-        conn.commit() # <--- BU JUDA MUHIM!
-        print(f"✅ BAZAGA YOZILDI: ID {new_id}")
+        query = """INSERT INTO remnants (category, material, width, height, qty, origin_order, location, created_by_user_id, created_by_name)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;"""
+        cursor.execute(query, (category, material, width, height, qty, order, location, user_id, user_name))
+        new_id = cursor.fetchone()['id']
+        conn.commit()
         return new_id
+    except: return None
+    finally: conn.close()
 
-    except Exception as e:
-        print(f"❌ SQL XATOSI (Add): {e}") # Xatoni Logda ko'rish uchun
-        conn.rollback()
-        return None
-    finally:
-        conn.close()
-
-# --- 2. QIDIRISH (SEARCH) ---
 def search_remnants(query_text):
     conn = get_db_connection()
     if not conn: return []
-    
     cursor = conn.cursor()
-    clean_query = normalize_text(query_text)
-    
     try:
-        sql = """
-        SELECT id, material, width, height, qty, location, origin_order 
-        FROM remnants 
-        WHERE (material ILIKE %s OR category ILIKE %s) 
-        AND status = 1
-        ORDER BY id DESC LIMIT 10
-        """
-        search_term = f"%{clean_query}%"
-        cursor.execute(sql, (search_term, search_term))
+        cursor.execute("SELECT * FROM remnants WHERE (material ILIKE %s OR category ILIKE %s) AND status = 1", (f"%{query_text}%", f"%{query_text}%"))
         return cursor.fetchall()
-    except Exception as e:
-        print(f"Xatolik (Search): {e}")
-        return []
-    finally:
-        conn.close()
+    finally: conn.close()
 
-# --- 3. RO'YXAT (LIST) ---
-def get_list(filter_type, user_id=None, limit=10, offset=0):
-    conn = get_db_connection()
-    if not conn: return []
-    cursor = conn.cursor()
-    
-    base_query = "SELECT id, material, width, height, qty, location, status FROM remnants"
-    params = []
-    
-    if filter_type == 'my_added':
-        where_clause = " WHERE created_by_user_id = %s AND status = 1"
-        params.append(user_id)
-        order_by = " ORDER BY id DESC"
-    elif filter_type == 'used':
-        where_clause = " WHERE status = 0"
-        order_by = " ORDER BY used_at DESC"
-    else:
-        where_clause = " WHERE status = 1"
-        order_by = " ORDER BY id DESC"
-
-    full_query = base_query + where_clause + order_by + " LIMIT %s OFFSET %s"
-    params.extend([limit, offset])
-    
-    try:
-        cursor.execute(full_query, tuple(params))
-        return cursor.fetchall()
-    finally:
-        conn.close()
-
-# --- 4. USERNI TEKSHIRISH (WHITELIST TIZIMI) ---
 def get_or_create_user(user_id, full_name, username):
     conn = get_db_connection()
     if not conn: return None
     cursor = conn.cursor()
-    
     try:
-        # 1. Userni bazadan qidiramiz
         cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
-        
-        # 2. Agar user yo'q bo'lsa -> Yangi qo'shamiz (RUXSATSIZ)
         if not user:
-            cursor.execute("""
-                INSERT INTO users 
-                (user_id, full_name, username, can_search, can_add, can_edit, can_delete, can_checkout)
-                VALUES (%s, %s, %s, 0, 0, 0, 0, 0)
-            """, (user_id, full_name, username))
+            cursor.execute("INSERT INTO users (user_id, full_name, username, can_search, can_add) VALUES (%s, %s, %s, 0, 0)", (user_id, full_name, username))
             conn.commit()
-            
-            # Yangi user ekanligini bildirish uchun belgi qo'shamiz
             return {"user_id": user_id, "can_search": 0, "is_new": True}
-            
-        return user # Bor userni qaytaramiz (is_new bo'lmaydi)
-        
-    except Exception as e:
-        print(f"User DB xatosi: {e}")
-        return None
-    finally:
-        conn.close()
+        return user
+    finally: conn.close()
 
-# ... (tepadagi kodlar qolaveradi)
-
-# --- 5. USER RUXSATINI YANGILASH (SYNC) ---
 def update_user_permission(user_id, can_search):
     conn = get_db_connection()
     if not conn: return
     cursor = conn.cursor()
-    
     try:
-        # Bazadagi userni yangilaymiz
-        # Sheetda 1 yoki 0 turibdi. Biz shuni bazaga yozamiz.
-        sql = """
-        UPDATE users 
-        SET can_search = %s, can_add = %s 
-        WHERE user_id = %s
-        """
-        # Hozircha can_search va can_add ga bir xil ruxsat beramiz
-        cursor.execute(sql, (can_search, can_search, user_id))
+        cursor.execute("UPDATE users SET can_search = %s, can_add = %s WHERE user_id = %s", (can_search, can_search, str(user_id)))
         conn.commit()
-    except Exception as e:
-        print(f"Update xatosi: {e}")
-    finally:
-        conn.close()
+    finally: conn.close()
 
+def sync_remnant_from_sheet(remnant_id, material, width, height, qty, location, status):
+    conn = get_db_connection()
+    if not conn: return
+    cursor = conn.cursor()
+    try:
+        clean_id = int(str(remnant_id).replace('#', ''))
+        cursor.execute("UPDATE remnants SET material=%s, width=%s, height=%s, qty=%s, location=%s, status=%s WHERE id=%s",
+                       (material, width, height, qty, location, status, clean_id))
+        conn.commit()
+    finally: conn.close()
