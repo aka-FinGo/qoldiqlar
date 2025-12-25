@@ -4,114 +4,51 @@ from config import SPREADSHEET_ID, CREDENTIALS_PATH
 from datetime import datetime
 
 def get_sheet_client():
-    """Google Sheetga ulanish"""
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     try:
-        # Secret File orqali ulanish
         creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, scope)
-        client = gspread.authorize(creds)
-        return client
+        return gspread.authorize(creds)
     except Exception as e:
         print(f"❌ GSheets ulanish xatosi: {e}")
         return None
 
-# --- 1. QOLDIQLARNI YOZISH (1-SAHIFA) ---
 def sync_new_remnant(data):
-    """Yangi qoldiqni 'Qoldiqlar' (index 0) sahifasiga yozish"""
+    """Yangi qoldiqni Sheetga yozish (A-M ustunlar)"""
     client = get_sheet_client()
     if not client: return
-
     try:
-        # 0-indeks bu birinchi sahifa
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
-        
         hozirgi_vaqt = datetime.now().strftime("%d.%m.%Y %H:%M")
-
-        # Rasmga asoslangan ustunlar tartibi (A dan Q gacha)
         row = [
-            f"#{data.get('id', 0)}",           # A: ID
-            hozirgi_vaqt,                      # B: Sana
-            data.get('category', ''),          # C: Kategoriya
-            data.get('material', ''),          # D: Material
-            data.get('width', 0),              # E: Bo'yi
-            data.get('height', 0),             # F: Eni
-            data.get('qty', 1),                # G: Soni
-            data.get('origin_order', ''),      # H: Buyurtma
-            data.get('user_name', ''),         # I: Kim (Ismi)
-            str(data.get('user_id', '')),      # J: User ID
-            data.get('location', ''),          # K: Lokatsiya
-            1,                                 # L: Status (1=Mavjud)
-            "",                                # M: Rasm ID
-            # --- Ishlatilganda to'ldiriladigan (Hozircha bo'sh) ---
-            "", "", "", ""                     # N, O, P, Q
-        ]
-        
+            f"#{data.get('id')}", hozirgi_vaqt, data.get('category'), data.get('material'),
+            data.get('width'), data.get('height'), data.get('qty'), data.get('origin_order'),
+            data.get('user_name'), str(data.get('user_id')), data.get('location'), 1, ""
+        ] + [""] * 4 # N, O, P, Q ustunlar bo'sh
         sheet.append_row(row)
-        print(f"✅ Qoldiq Sheetga yozildi: #{data.get('id')}")
-        
-    except Exception as e:
-        print(f"❌ Qoldiqni yozishda xatolik: {e}")
+    except Exception as e: print(f"❌ Sheetga yozishda xato: {e}")
 
-# --- 2. USERLARNI YOZISH (2-SAHIFA) ---
 def sync_new_user(user_id, full_name):
-    """Yangi userni 'Ruxsatlar' (index 1) sahifasiga yozish"""
+    """Yangi userni Ruxsatlar varag'iga yozish"""
     client = get_sheet_client()
     if not client: return
-
     try:
-        # 1-indeks bu ikkinchi sahifa
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(1)
-        
-        # Takrorlanmasligi uchun tekshiramiz (A ustun - ID lar)
-        try:
-            existing_ids = sheet.col_values(1) 
-            if str(user_id) in existing_ids:
-                return # User allaqachon bor, qayta yozmaymiz
-        except:
-            pass 
+        if str(user_id) not in sheet.col_values(1):
+            sheet.append_row([str(user_id), full_name, 0, 0, 0, 0, 0])
+    except Exception as e: print(f"❌ Userni sheetga yozishda xato: {e}")
 
-        # --- 2-RASM ASOSIDA TARTIB ---
-        # A: ID | B: Ism | C: Qidirish | D: Qo'shish | E: Tahrir | F: O'chirish | G: Ishlatish
-        # HAMMA RUXSATLAR "0" (Admin ruxsat bermaguncha)
-        row = [
-            str(user_id),  # A: User ID
-            full_name,     # B: Ismi
-            0,             # C: Qidirish (YO'Q)
-            0,             # D: Qoshish (YO'Q)
-            0,             # E: Tahrirlash (YO'Q)
-            0,             # F: Ochirish (YO'Q)
-            0              # G: Ishlatish (YO'Q)
-        ]
-        
-        sheet.append_row(row)
-        print(f"✅ Yangi User Sheetga (Ruxsatsiz) qo'shildi: {full_name}")
-        
-    except Exception as e:
-        print(f"❌ Userni yozishda xatolik: {e}")
-
-# ... (tepadagi kodlar qolaveradi)
-
-# --- 3. RUXSATLARNI O'QISH (SYNC UCHUN) ---
 def get_all_users_from_sheet():
-    """Sheetdagi barcha userlar va ularning ruxsatlarini o'qib oladi"""
+    """Ruxsatlarni o'qish (2-sahifa)"""
     client = get_sheet_client()
     if not client: return []
-
     try:
-        # 2-sahifa (Ruxsatlar)
-        sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(1)
-        
-        # Hamma qatorlarni olamiz (faqat data borlarini)
-        all_data = sheet.get_all_values()
-        
-        # 1-qator sarlavha bo'lishi mumkin, uni tashlab yuboramiz
-        if len(all_data) > 0:
-            return all_data[1:] # 2-qatordan boshlab qaytaramiz
-        return []
-        
-    except Exception as e:
-        print(f"❌ Sheetni o'qishda xatolik: {e}")
-        return []
+        return client.open_by_key(SPREADSHEET_ID).get_worksheet(1).get_all_values()[1:]
+    except: return []
+
+def get_all_remnants_from_sheet():
+    """Qoldiqlarni o'qish (1-sahifa)"""
+    client = get_sheet_client()
+    if not client: return []
+    try:
+        return client.open_by_key(SPREADSHEET_ID).get_worksheet(0).get_all_values()[1:]
+    except: return []
