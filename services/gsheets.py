@@ -91,3 +91,27 @@ def sync_new_user(user_id, full_name):
         
     except Exception as e:
         print(f"❌ Userni yozishda xatolik: {e}")
+
+# ... (tepadagi kodlar qolaveradi)
+
+# --- 3. RUXSATLARNI O'QISH (SYNC UCHUN) ---
+def get_all_users_from_sheet():
+    """Sheetdagi barcha userlar va ularning ruxsatlarini o'qib oladi"""
+    client = get_sheet_client()
+    if not client: return []
+
+    try:
+        # 2-sahifa (Ruxsatlar)
+        sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(1)
+        
+        # Hamma qatorlarni olamiz (faqat data borlarini)
+        all_data = sheet.get_all_values()
+        
+        # 1-qator sarlavha bo'lishi mumkin, uni tashlab yuboramiz
+        if len(all_data) > 0:
+            return all_data[1:] # 2-qatordan boshlab qaytaramiz
+        return []
+        
+    except Exception as e:
+        print(f"❌ Sheetni o'qishda xatolik: {e}")
+        return []
