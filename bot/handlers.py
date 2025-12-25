@@ -3,6 +3,8 @@ from aiogram.filters import Command
 from services.ai_core import analyze_message
 from services.gsheets import sync_new_user, sync_new_remnant
 import database.queries as db
+from services.gsheets import get_all_users_from_sheet
+from aiogram.filters import Command
 
 router = Router()
 
@@ -125,3 +127,41 @@ async def handle_text(message: types.Message):
                 })
         
         await status_msg.edit_text(report, parse_mode="Markdown")
+
+# --- ADMIN UCHUN: BAZANI SHEET BILAN YANGILASH ---
+@router.message(Command("sync"))
+async def cmd_sync(message: types.Message):
+    # Xavfsizlik: Buni faqat ADMIN ishlata olsin (ID ingizni tekshirish kerak)
+    # Hozircha hamma ishlataveradi (keyin cheklaymiz)
+    
+    status_msg = await message.answer("🔄 **Google Sheet bilan sinxronlash ketmoqda...**")
+    
+    # 1. Sheetdan hamma userni olamiz
+    sheet_users = get_all_users_from_sheet()
+    
+    if not sheet_users:
+        await status_msg.edit_text("❌ Sheetdan ma'lumot o'qib bo'lmadi yoki u bo'sh.")
+        return
+
+    count = 0
+    # 2. Har bir qatorni tekshiramiz
+    for row in sheet_users:
+        # Sheet tuzilishi: A=ID (0-indeks), C=Qidirish (2-indeks)
+        try:
+            user_id = row[0] # A ustun
+            permission = row[2] # C ustun (1 yoki 0)
+            
+            # Agar C ustunda nimanidir yozgan bo'lsangiz (1 yoki TRUE)
+            if str(permission).strip() in ['1', 'TRUE', 'True', 'ha']:
+                status = 1
+            else:
+                status = 0
+                
+            # Bazani yangilaymiz
+            db.update_user_permission(user_id, status)
+            count += 1
+        except Exception as e:
+            print(f"Qator xatosi: {e}")
+            continue
+
+    await status_msg.edit_text(f"✅ **Bajarildi!**\n\nGoogle Sheetdan {count} ta foydalanuvchi ma'lumotlari bazaga yuklandi.")
