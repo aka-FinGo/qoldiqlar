@@ -4,11 +4,11 @@ from services.utils import normalize_text
 # --- 1. QO'SHISH (ADD) ---
 def add_remnant(category, material, width, height, qty, order, location, user_id, user_name):
     conn = get_db_connection()
-    if not conn: return None
+    if not conn: 
+        print("❌ Bazaga ulanib bo'lmadi!")
+        return None
     
     cursor = conn.cursor()
-    
-    # Matnni tozalash va lotinlashtirish
     clean_mat = normalize_text(material)
     clean_cat = normalize_text(category)
     
@@ -20,11 +20,16 @@ def add_remnant(category, material, width, height, qty, order, location, user_id
         RETURNING id;
         """
         cursor.execute(query, (clean_cat, clean_mat, width, height, qty, order, location, user_id, user_name))
-        new_id = cursor.fetchone()['id']
-        conn.commit()
+        
+        row = cursor.fetchone() # Natijani olamiz
+        new_id = row['id']
+        
+        conn.commit() # <--- BU JUDA MUHIM!
+        print(f"✅ BAZAGA YOZILDI: ID {new_id}")
         return new_id
+
     except Exception as e:
-        print(f"Xatolik (Add): {e}")
+        print(f"❌ SQL XATOSI (Add): {e}") # Xatoni Logda ko'rish uchun
         conn.rollback()
         return None
     finally:
