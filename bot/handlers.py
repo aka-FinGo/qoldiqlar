@@ -1,90 +1,120 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from services.ai_core import analyze_message
+from services.gsheets import sync_new_user, sync_new_remnant
 import database.queries as db
 
 router = Router()
 
-# 1. /start buyrug'i
+# Admin Username (Userlar bog'lanishi uchun)
+ADMIN_USERNAME = "@SizningUsername" # <-- SHU YERGA O'ZINGIZNIKINI YOZING
+
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
+    user = message.from_user
+    
+    # 1. Bazadan tekshiramiz (yoki yangi qo'shamiz)
+    db_user = db.get_or_create_user(user.id, user.full_name, user.username)
+    
+    # 2. Agar yangi bo'lsa -> Google Sheetga ham yozib qo'yamiz
+    if db_user and db_user.get('is_new'):
+        sync_new_user(user.id, user.full_name)
+        await message.answer(
+            f"👋 Salom, {user.full_name}!\n\n"
+            "🚫 **Sizda hozircha botdan foydalanishga ruxsat yo'q.**\n"
+            "Iltimos, administrator bilan bog'laning va ruxsat so'rang.\n\n"
+            f"👨‍💻 Admin: {ADMIN_USERNAME}"
+        )
+        return
+
+    # 3. Agar eski user bo'lsa lekin bloklangan bo'lsa
+    if db_user and db_user.get('can_search') == 0:
+        await message.answer(f"🔒 **Sizning profilingiz faolsizlantirilgan.**\nAdminga yozing: {ADMIN_USERNAME}")
+        return
+
+    # 4. Ruxsati borlarga
     await message.answer(
-        "👋 **Salom! Men Mebel Qoldiqlari Botiman.**\n\n"
-        "Menga shunchaki gapiring, men tushunaman:\n"
-        "🔍 *Qidirish:* 'Oq dsp bormi?'\n"
-        "➕ *Qo'shish:* 'Mokko 1200x300 dan 2 ta, 123-zakazdan qoldi'\n\n"
-        "Boshlash uchun yozing! 👇",
-        parse_mode="Markdown"
+        "👋 **Xush kelibsiz!**\n\n"
+        "Bot tayyor. Menga 'Oq dsp bormi?' deb yozishingiz mumkin."
     )
 
-# 2. Asosiy Matnli Xabarlar (AI bilan ishlash)
 @router.message(F.text)
 async def handle_text(message: types.Message):
-    user_text = message.text
-    status_msg = await message.answer("🤔 _O'ylayapman..._", parse_mode="Markdown")
-
-    # 1-QADAM: Matnni AI ga beramiz
-    ai_result = await analyze_message(user_text)
+    user = message.from_user
     
-    # Agar AI tushunmasa yoki xato bo'lsa
+    # --- XAVFSIZLIK TEKSHIRUVI ---
+    db_user = db.get_or_create_user(user.id, user.full_name, user.username)
+    
+    # Agar user bazada yo'q bo'lsa yoki 'can_search' ruxsati 0 bo'lsa
+    if not db_user or db_user.get('can_search') == 0:
+        await message.answer(f"⛔️ **Ruxsat yo'q!**\nAdmin bilan bog'laning: {ADMIN_USERNAME}")
+        return
+    # -----------------------------
+
+    status_msg = await message.answer("🤔 _O'ylayapman..._", parse_mode="Markdown")
+    ai_result = await analyze_message(message.text)
+    
     if not ai_result or ai_result.get('cmd') == 'error':
-        await status_msg.edit_text("❌ Uzr, tushunmadim yoki tizimda xatolik.")
+        await status_msg.edit_text("❌ Tushunmadim.")
         return
 
     cmd = ai_result.get('cmd')
     
-    # --- SENARIY A: QIDIRUV (SEARCH) ---
+    # --- QIDIRUV ---
     if cmd == 'search':
-        # AI bizga qidiruv so'zini beradi (masalan: "oq dsp")
-        query_text = ai_result.get('query', user_text) # Agar query bo'lmasa, user so'zini olamiz
-        
+        # Qidiruv ruxsati bormi? (Garchi tepada tekshirgan bo'lsak ham)
+        if db_user.get('can_search') == 0:
+            await status_msg.edit_text("🔒 Sizga qidirish mumkin emas.")
+            return
+            
+        query_text = ai_result.get('query', message.text)
         results = db.search_remnants(query_text)
         
         if not results:
-            await status_msg.edit_text(f"🔍 '{query_text}' bo'yicha hech narsa topilmadi.")
+            await status_msg.edit_text("🤷‍♂️ Hech narsa topilmadi.")
         else:
-            # Javobni chiroyli qilish
-            text = f"✅ **Topilgan qoldiqlar ({len(results)} ta):**\n\n"
+            text = f"✅ **Natijalar ({len(results)} ta):**\n\n"
             for item in results:
-                # Bazadan kelgan ma'lumotlarni o'qiymiz
-                # item['origin_order'] -> ba'zan None bo'lishi mumkin, shuning uchun 'get' ishlatamiz agar dict bo'lsa
-                # Psycopg2 RealDictCursor ishlatganimiz uchun item bu Dictionary
-                
-                info = f"🔹 **{item['material']}** | {item['width']}x{item['height']} mm\n"
-                info += f"   📍 Joy: {item['location'] or 'Noma`lum'}\n"
-                info += f"   📦 Soni: {item['qty']} dona | ID: #{item['id']}\n\n"
-                text += info
-            
+                text += f"🔹 **{item['material']}** | {item['width']}x{item['height']} | {item['qty']} dona\n"
+                text += f"   📍 {item['location']} (#{item['id']})\n\n"
             await status_msg.edit_text(text, parse_mode="Markdown")
 
-    # --- SENARIY B: QO'SHISH (BATCH ADD) ---
+    # --- QO'SHISH ---
     elif cmd == 'batch_add':
+        # Qo'shish ruxsati bormi? (Buni alohida tekshiramiz)
+        if db_user.get('can_add') == 0:
+            await status_msg.edit_text("🚫 **Sizda qoldiq qo'shish huquqi yo'q.** faqat qidira olasiz.")
+            return
+
         items = ai_result.get('items', [])
-        added_count = 0
-        report = "💾 **Qoldiqlar saqlandi:**\n\n"
+        report = "💾 **Saqlandi:**\n"
         
         for item in items:
-            # Bazaga yozamiz
             new_id = db.add_remnant(
-                category=item.get('category', 'Boshqa'),
-                material=item.get('material', 'Noma`lum'),
-                width=item.get('width', 0),
-                height=item.get('height', 0),
+                category=item.get('category'),
+                material=item.get('material'),
+                width=item.get('width'),
+                height=item.get('height'),
                 qty=item.get('qty', 1),
-                order=item.get('order', 'Noma`lum'),
-                location=item.get('location', 'Sex'),
+                order=item.get('order'),
+                location=item.get('location'),
                 user_id=message.from_user.id,
                 user_name=message.from_user.full_name
             )
-            
             if new_id:
-                added_count += 1
-                report += f"✅ **{item.get('material')}** {item.get('width')}x{item.get('height')} (#{new_id})\n"
-            else:
-                report += f"❌ **{item.get('material')}** (Xatolik bo'ldi)\n"
+                report += f"✅ {item.get('material')} (#{new_id})\n"
+                # Sheetga yozish
+                sync_new_remnant({
+                    'id': new_id,
+                    'category': item.get('category'),
+                    'material': item.get('material'),
+                    'width': item.get('width'),
+                    'height': item.get('height'),
+                    'qty': item.get('qty', 1),
+                    'origin_order': item.get('order'),
+                    'location': item.get('location'),
+                    'user_id': message.from_user.id,
+                    'user_name': message.from_user.full_name
+                })
         
         await status_msg.edit_text(report, parse_mode="Markdown")
-        
-    # --- SENARIY C: TUSHUNARSIZ BUYRUQ ---
-    else:
-        await status_msg.edit_text("🤷‍♂️ AI buyruqni tushundi, lekin men bajara olmadim.")
