@@ -119,3 +119,28 @@ def get_or_create_user(user_id, full_name, username):
         return None
     finally:
         conn.close()
+
+# ... (tepadagi kodlar qolaveradi)
+
+# --- 5. USER RUXSATINI YANGILASH (SYNC) ---
+def update_user_permission(user_id, can_search):
+    conn = get_db_connection()
+    if not conn: return
+    cursor = conn.cursor()
+    
+    try:
+        # Bazadagi userni yangilaymiz
+        # Sheetda 1 yoki 0 turibdi. Biz shuni bazaga yozamiz.
+        sql = """
+        UPDATE users 
+        SET can_search = %s, can_add = %s 
+        WHERE user_id = %s
+        """
+        # Hozircha can_search va can_add ga bir xil ruxsat beramiz
+        cursor.execute(sql, (can_search, can_search, user_id))
+        conn.commit()
+    except Exception as e:
+        print(f"Update xatosi: {e}")
+    finally:
+        conn.close()
+
