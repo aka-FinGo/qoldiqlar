@@ -1,5 +1,4 @@
 import json
-import re # JSONni tozalash uchun kerak
 from groq import Groq
 from config import GROQ_API_KEY
 
@@ -7,28 +6,41 @@ client = Groq(api_key=GROQ_API_KEY)
 
 SYSTEM_PROMPT = """
 Sen mebel sexi omborini boshqaruvchi aqlli botsan.
-Foydalanuvchi matnini tahlil qilib, quyidagi JSON formatda javob qaytar.
+Foydalanuvchi matnini tahlil qilib, FAQAT JSON qaytar.
 
-BUYRUQLAR (cmd):
-1. "search" - Qidiruv. Params: { "query": "oq dsp" }
+BUYRUQLAR:
+1. "search" - Qidiruv.
 2. "batch_add" - Qo'shish.
-   Params: "items": [ { "category": "...", "material": "...", "width": int, "height": int, "qty": int, "order": "...", "location": "..." } ]
 
-MUHIM QOIDALAR:
-1. O'lchamlar odatda "Uzunlik x Eni" formatida bo'ladi (Masalan: 500x300).
-2. Agar "500x300x2" yoki "500x300x2ta" deyilsa, oxirgi raqam (2) bu SONI (qty) deb qabul qilinadi.
-3. Material nomini aniq ajrat (MDF, LDSP, XDF, Akril). Rangi bo'lsa qo'shib yoz (Oq XDF).
-4. Agar "zakazdan" so'zi bo'lsa, uni 'order' ga yoz.
-5. JSON javobdan boshqa HECH NARSA yozma.
+MUHIM QOIDALAR (Qo'shish uchun):
+1. O'lchamlar formati: "Uzunlik x Eni" (500x300).
+2. SONI (QTY):
+   - Agar "500x300x2" yoki "500x300x2ta" desa -> qty=2, qalinlik emas!
+   - Agar "2 dona", "2 sht" desa -> qty=2.
+   - Default = 1.
+3. KATEGORIYA (Category):
+   - Agar user aytmasa, material nomidan ajratib ol.
+   - "Oq XDF" -> Category="XDF", Material="Oq"
+   - "Mokko" -> Category="LDSP" (Default)
+   - "MDF", "LMDF", "Akril" so'zlari bu Kategoriya.
+4. ORDER (Zakaz): "123-zakaz", "123_12", "Ali aka uchun" kabi gaplarni 'order' ga yoz.
+5. LOCATION (Joy): "Sexda", "Zamin barakada", "Skladda" -> 'location' ga yoz.
 
 MISOLLAR:
-User: "Oq dsp 1200x300 dan 5 ta, 500x200 dan 1 ta 123-zakaz"
+User: "1500x150x1TA xdf oq, Zamin barakada, 123_12 zakazdan"
 JSON:
 {
   "cmd": "batch_add",
   "items": [
-    {"material": "Oq dsp", "width": 1200, "height": 300, "qty": 5, "order": "123"},
-    {"material": "Oq dsp", "width": 500, "height": 200, "qty": 1, "order": "123"}
+    {
+      "category": "XDF",
+      "material": "Oq",
+      "width": 1500,
+      "height": 150,
+      "qty": 1,
+      "location": "Zamin baraka",
+      "order": "123_12"
+    }
   ]
 }
 """
@@ -45,15 +57,11 @@ async def analyze_message(text):
         )
         
         response_text = chat_completion.choices[0].message.content
-        
-        # Ba'zan AI tushuntirish berib yuboradi, biz faqat JSONni qirqib olamiz
         start = response_text.find('{')
         end = response_text.rfind('}') + 1
-        if start != -1 and end != -1:
-            json_str = response_text[start:end]
-            return json.loads(json_str)
-        else:
-            return {"cmd": "error", "msg": "JSON topilmadi"}
+        if start != -1:
+            return json.loads(response_text[start:end])
+        return {"cmd": "error"}
         
     except Exception as e:
         print(f"AI Xatosi: {e}")
