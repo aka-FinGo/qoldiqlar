@@ -5,23 +5,33 @@ def add_remnant(category, material, width, height, qty, order, location, user_id
     if not conn: return None
     cursor = conn.cursor()
     try:
-        query = """INSERT INTO remnants (category, material, width, height, qty, origin_order, location, created_by_user_id, created_by_name)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;"""
-        cursor.execute(query, (category, material, width, height, qty, order, location, user_id, user_name))
-        new_id = cursor.fetchone()['id']
-        conn.commit()
-        return new_id
+        # 1. Dublikatni tekshirish (Material, Bo'yi, Eni va Joylashuvi bir xil bo'lsa)
+        check_query = """
+            SELECT id, qty FROM remnants 
+            WHERE material = %s AND width = %s AND height = %s AND location = %s AND status = 1
+            LIMIT 1;
+        """
+        cursor.execute(check_query, (material, width, height, location))
+        existing = cursor.fetchone()
+
+        if existing:
+            # Mavjud bo'lsa - SONINI OSHIRAMIZ
+            new_qty = existing['qty'] + qty
+            update_query = "UPDATE remnants SET qty = %s WHERE id = %s"
+            cursor.execute(update_query, (new_qty, existing['id']))
+            conn.commit()
+            return f"upd_{existing['id']}" # Yangilanganini bildirish uchun
+        else:
+            # Yo'q bo'lsa - YANGI QO'SHAMIZ
+            query = """INSERT INTO remnants (category, material, width, height, qty, origin_order, location, created_by_user_id, created_by_name)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;"""
+            cursor.execute(query, (category, material, width, height, qty, order, location, user_id, user_name))
+            new_id = cursor.fetchone()['id']
+            conn.commit()
+            return new_id
     except: return None
     finally: conn.close()
 
-def search_remnants(query_text):
-    conn = get_db_connection()
-    if not conn: return []
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM remnants WHERE (material ILIKE %s OR category ILIKE %s) AND status = 1", (f"%{query_text}%", f"%{query_text}%"))
-        return cursor.fetchall()
-    finally: conn.close()
 
 def get_or_create_user(user_id, full_name, username):
     conn = get_db_connection()
