@@ -44,19 +44,22 @@ def check_duplicate(material, width, height, location):
         conn.close()
 
 # --- 3. SONINI YANGILASH (DUBLIKAT TASDIQLANGANDA) ---
-def update_qty(remnant_id, new_qty):
-    """Mavjud qoldiqning sonini o'zgartirish"""
+def update_qty(remnant_id, add_qty):
     conn = get_db_connection()
-    if not conn: return
+    if not conn: return None
     cursor = conn.cursor()
     try:
+        # Avval eski sonini olamiz
+        cursor.execute("SELECT qty FROM remnants WHERE id = %s", (remnant_id,))
+        old_qty = cursor.fetchone()['qty']
+        new_qty = old_qty + add_qty
+        
+        # Keyin yangilaymiz
         cursor.execute("UPDATE remnants SET qty = %s WHERE id = %s", (new_qty, remnant_id))
         conn.commit()
-        print(f"✅ ID #{remnant_id} soni {new_qty} ga yangilandi.")
-    except Exception as e:
-        print(f"❌ Soni yangilashda xato: {e}")
-    finally:
-        conn.close()
+        return new_qty # Yangi sonni qaytaramiz
+    except: return None
+    finally: conn.close()
 
 # --- 4. YANGI QOLDIQ QO'SHISH (FINAL) ---
 def add_remnant_final(item, user_id, user_name):
