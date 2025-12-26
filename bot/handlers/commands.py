@@ -1,8 +1,7 @@
 import asyncio
 from aiogram import Router, types, F
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder # Bu import kerak
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 import database.queries as db
 from config import ADMIN_ID, ADMIN_USERNAME
 from services.gsheets import get_all_users_from_sheet, get_all_remnants_from_sheet
@@ -10,7 +9,7 @@ from .utils import format_search_results, get_search_keyboard
 
 router = Router()
 
-# --- 1. START BUYRUG'I ---
+# --- 1. START & HELP ---
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     user = message.from_user
@@ -18,29 +17,28 @@ async def cmd_start(message: types.Message):
     await message.answer(
         f"👋 <b>Assalomu alaykum, {user.full_name}!</b>\n\n"
         "Men mebel qoldiqlarini boshqarishga yordam beraman.\n"
-        "Qidirish uchun material nomi yoki o'lchamini yozing.\n"
-        "Masalan: <i>'Oq ldsp'</i> yoki <i>'200x300 detal bormi?'</i>\n\n"
+        "Qidirish uchun shunchaki yozing:\n"
+        "<i>'Oq ldsp'</i> yoki <i>'200x300 detal bormi?'</i>\n\n"
         "Yordam uchun: /help", 
         parse_mode="HTML"
     )
 
-# --- 2. HELP (YORDAM) - YANGI QO'SHILDI ---
 @router.message(Command("help"))
 async def cmd_help(message: types.Message):
     text = (
-        "🤖 <b>Botdan foydalanish yo'riqnomasi:</b>\n\n"
+        "🤖 <b>Botdan foydalanish:</b>\n\n"
         "🔎 <b>Qidiruv:</b>\n"
-        "• Shunchaki yozing: <i>'Oq xdf'</i>, <i>'Mdf qora'</i>\n"
-        "• O'lcham bo'yicha: <i>'200x500 detal kessa bo'ladimi?'</i>\n\n"
+        "• <i>'Oq xdf'</i> - Material nomi bo'yicha\n"
+        "• <i>'200x500'</i> - O'lcham bo'yicha\n"
+        "• <i>'150_12'</i> - Zakaz raqami bo'yicha\n\n"
         "📋 <b>Buyruqlar:</b>\n"
-        "/list - Barcha mavjud qoldiqlarni ko'rish\n"
-        "/ishlatilganlar - Ishlatib bo'lingan qoldiqlar tarixi\n"
-        "/men_ishlatganlarim - O'zingiz ishlatgan qoldiqlar\n"
-        "/start - Botni qayta ishga tushirish"
+        "/list - Barcha qoldiqlar\n"
+        "/ishlatilganlar - Tarix\n"
+        "/sync - Bazani yangilash (Admin)"
     )
     await message.answer(text, parse_mode="HTML")
 
-# --- 3. RO'YXATLAR ---
+# --- 2. LIST COMMANDS ---
 @router.message(Command("list"))
 async def cmd_list_all(message: types.Message):
     items = db.get_all_active_remnants()
@@ -55,62 +53,67 @@ async def cmd_list_all(message: types.Message):
 @router.message(Command("ishlatilganlar"))
 async def cmd_all_used(message: types.Message):
     items = db.get_used_remnants()
-    if not items:
-        return await message.answer("📭 Ishlatilgan qoldiqlar tarixi bo'sh.")
-    
-    text = "📂 <b>Barcha ishlatilgan qoldiqlar:</b>\n\n"
-    text += format_search_results(items[:10], len(items), 0) # Oxirgi 10 tasi
+    if not items: return await message.answer("📭 Tarix bo'sh.")
+    text = "📂 <b>Ishlatilganlar tarixi:</b>\n\n" + format_search_results(items[:10], len(items), 0)
     await message.answer(text, parse_mode="HTML")
 
 @router.message(Command("men_ishlatganlarim"))
 async def cmd_my_used(message: types.Message):
     items = db.get_used_remnants(user_id=message.from_user.id)
-    if not items:
-        return await message.answer("📭 Siz hali hech qanday qoldiq ishlatmagansiz.")
-    
-    text = "👤 <b>Siz ishlatgan qoldiqlar:</b>\n\n"
-    text += format_search_results(items[:10], len(items), 0)
+    if not items: return await message.answer("📭 Siz hali qoldiq ishlatmadingiz.")
+    text = "👤 <b>Sizning tarixingiz:</b>\n\n" + format_search_results(items[:10], len(items), 0)
     await message.answer(text, parse_mode="HTML")
 
-# --- 4. SINXRONLASH (FONDA) ---
+# --- 3. SYNC (TUZATILGAN QISM) ---
 @router.message(Command("sync"))
 async def cmd_sync(message: types.Message):
     if str(message.from_user.id) != str(ADMIN_ID): return
-    await message.answer("🔄 <b>Sinxronlash fon rejimida boshlandi...</b>", parse_mode="HTML")
+    await message.answer("🔄 <b>Sinxronlash boshlandi...</b>", parse_mode="HTML")
     asyncio.create_task(run_background_sync(message))
 
 async def run_background_sync(message):
     try:
+        # 1. Userlarni yangilash
         users = get_all_users_from_sheet()
         for row in users:
             try: db.update_user_permission(row[0], 1 if str(row[2]).lower() in ['1', 'true', 'ha', 'bor'] else 0)
             except: continue
             
+        # 2. Qoldiqlarni yangilash
         remnants = get_all_remnants_from_sheet()
         for r in remnants:
             try:
-                # Skrinshotga mos indekslar:
-                # A(0)=ID, D(3)=Mat, E(4)=H, F(5)=W, G(6)=Qty, H(7)=Order, K(10)=Loc, L(11)=Status
+                # DIQQAT: Indekslar Sheetdagi ustunlarga moslandi (A=0)
+                # r[7] -> H ustuni (Buyurtma raqami)
+                # r[10] -> K ustuni (Lokatsiya)
+                # r[11] -> L ustuni (Status)
+                
                 db.sync_remnant_from_sheet(
-                    r[0], r[3], int(r[4]), int(r[5]), int(r[6]), 
-                    r[7],  # Order (H ustuni)
-                    r[10], # Location (K ustuni)
-                    int(r[11]) # Status (L ustuni)
+                    r[0],      # ID
+                    r[3],      # Material
+                    int(r[4]), # Bo'yi
+                    int(r[5]), # Eni
+                    int(r[6]), # Soni
+                    r[7],      # <--- TUZATILDI: H ustuni (Buyurtma)
+                    r[10],     # Lokatsiya
+                    int(r[11]) # Status
                 )
-            except: continue
-        await message.answer("✅ <b>Sinxronlash muvaffaqiyatli yakunlandi!</b>", parse_mode="HTML")
+            except Exception as e: 
+                print(f"Sync error row: {e}")
+                continue
+                
+        await message.answer("✅ <b>Sinxronlash tugadi!</b>\nMa'lumotlar yangilandi.", parse_mode="HTML")
     except Exception as e:
         await message.answer(f"❌ Xato: {e}")
 
-# --- 5. VIEW (KO'RISH) ---
+# --- 4. VIEW DETAIL ---
 @router.message(F.text.startswith("/view_"))
 async def cmd_view_detail(message: types.Message):
     try:
         r_id = int(message.text.split("_")[1])
         item = db.get_remnant_details(r_id)
-        if not item: return await message.answer("❌ Ma'lumot topilmadi.")
+        if not item: return await message.answer("❌ Topilmadi.")
 
-        # Xatolikni oldini olish uchun o'zgaruvchilarni tashqarida olamiz
         order_val = item.get('origin_order', "Yo'q")
         loc_val = item.get('location', "Noma'lum")
 
@@ -125,11 +128,10 @@ async def cmd_view_detail(message: types.Message):
         if item['status'] == 1:
             kb.button(text="✅ Ishlatish (Olish)", callback_data=f"use:{item['id']}")
         else:
-            # Qaytarish logikasi
             used_by = str(item.get('used_by', ''))
             current_user = str(message.from_user.id)
             if used_by == current_user or current_user == str(ADMIN_ID):
                 kb.button(text="🔄 Qaytarib qo'yish", callback_data=f"restore:{item['id']}")
         
         await message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
-    except Exception as e: print(f"View error: {e}")
+    except: pass
