@@ -28,16 +28,18 @@ def get_search_keyboard(query, offset, total_results):
     return builder.as_markup()
 
 def format_search_results(items, total, offset):
+    # Markdown o'rniga HTML teglari: <b> (bold)
     text = f"🔍 <b>Natijalar:</b> (Jami: {total})\n\n"
     for i, item in enumerate(items, 1):
         item_id = item['id']
-        # Material va kategoriyani birlashtiramiz
-        title = f"{item.get('category', '')} {item.get('material', '')}".strip()
+        # Xatolikni oldini olish uchun ma'lumotlarni tekstga aylantiramiz
+        cat = str(item.get('category', ''))
+        mat = str(item.get('material', ''))
+        loc = str(item.get('location', ''))
         
-        text += (f"{offset + i}. <b>{title}</b>\n"
+        text += (f"{offset + i}. <b>{cat} {mat}</b>\n"
                  f"📏 {item['width']}x{item['height']} | 📦 {item['qty']} ta\n"
-                 f"📍 {item['location'] if item['location'] else 'Ombor'}\n"
-                 f"🔎 Ko'rish: /view_{item_id}\n" # TAGCHIZIQ QO'SHILDI
+                 f"📍 {loc} | /view_{item_id}\n" # Tagchiziq bilan /view_id
                  f"----------------------------\n")
     return text
 
