@@ -16,7 +16,7 @@ BUYRUQLAR:
 
 QOIDALAR:
 - O'LCHAM: Millimetrda hisobla (1.2 metr = 1200). "Uzunlik x Eni" formatida ajrat.
-- MATERIAL: Kategoriya (XDF, LDSP, MDF, Akril) va rangini (Oq, Dub karmen) aniq ajrat.
+- MATERIAL: Kategoriya (XDF, LDSP, MDF, Akril, Dsp) va rangini (Oq, Dub karmen, Qora, antratsit, kashemir, beliy brilliant, snonoviy kost, agt 3019, agt 3020) aniq ajrat.
 - SONI: "x2", "3ta", "5 dona" kabilarni raqamga aylantir. Default=1.
 - BUYURTMA (order): "123_12", "№50", "Ali aka zakazi" kabi identifikatorlarni ajrat.
 - LOKATSIYA VA IZOH (location): O'lcham, material va zakaz raqamidan tashqari barcha so'zlarni (joyi, holati, sababi, brak ekanligi) bitta matn qilib 'location' maydoniga jamla. 
