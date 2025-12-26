@@ -103,6 +103,48 @@ async def cancel_add(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text("❌ Bekor qilindi.")
     await state.clear()
     await callback.answer()
+    # --- COMMAND HANDLERS ---
+
+@router.message(Command("start"))
+async def cmd_start(message: types.Message):
+    user = message.from_user
+    db_user = db.get_or_create_user(user.id, user.full_name, user.username)
+    
+    if db_user and db_user.get('is_new'):
+        sync_new_user(user.id, user.full_name)
+        await message.answer(f"👋 Salom! Siz ro'yxatga olindingiz.\nBotdan foydalanish uchun admin ruxsati kerak: {ADMIN_USERNAME}")
+        return
+
+    await message.answer("👋 Xush kelibsiz! Material qidirish yoki qo'shish uchun xabar yozing.")
+
+@router.message(F.text.startswith("/view_"))
+async def cmd_view_detail(message: types.Message):
+    try:
+        r_id = int(message.text.split("_")[1])
+        await show_item_details(message, r_id)
+    except:
+        await message.answer("❌ Noto'g'ri ID")
+
+@router.message(Command("sync"))
+async def cmd_sync(message: types.Message):
+    if str(message.from_user.id) != str(ADMIN_ID): return
+    
+    status_msg = await message.answer("🔄 **Sinxronlash ketmoqda...**")
+    sheet_users = get_all_users_from_sheet()
+    
+    count = 0
+    for row in sheet_users:
+        try:
+            u_id, p_val = row[0], str(row[2]).lower().strip()
+            status = 1 if p_val in ['1', 'true', 'ha', 'bor'] else 0
+            db.update_user_permission(u_id, status)
+            count += 1
+        except: continue
+    await status_msg.edit_text(f"✅ Bajarildi! {count} ta user ruxsati yangilandi.")
+
+# --- CALLBACK HANDLERS ---
+
+
 
 # --- ASOSIY FUNKSIYALAR ---
 
