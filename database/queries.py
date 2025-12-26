@@ -160,17 +160,22 @@ def sync_remnant_from_sheet(remnant_id, material, width, height, qty, location, 
 
 # --- 8. Qoldiqlarni qaytarib joyiga qo'yish (Undo) yoki kim ishlatganini bilish uchun bazaga status (1-bor, 0-ishlatilgan) va updated_at ---
 def use_remnant(remnant_id, user_id):
-    """Qoldiqni ishlatilgan (status=0) deb belgilash"""
     conn = get_db_connection()
+    if not conn: return False
     cursor = conn.cursor()
     try:
+        # Statusni 0 qilamiz, ishlatgan odam IDsi va vaqtini yozamiz
         cursor.execute(
-            "UPDATE remnants SET status = 0, used_by = %s, updated_at = %s WHERE id = %s",
-            (user_id, datetime.now(), remnant_id)
+            "UPDATE remnants SET status = 0, used_by = %s, updated_at = NOW() WHERE id = %s AND status = 1",
+            (str(user_id), remnant_id)
         )
         conn.commit()
-        return cursor.rowcount > 0
-    finally: conn.close()
+        return cursor.rowcount > 0 # Agar o'zgargan bo'lsa True qaytaradi
+    except Exception as e:
+        print(f"❌ DB use_remnant error: {e}")
+        return False
+    finally:
+        conn.close()
 
 def restore_remnant(remnant_id):
     """Xatolik bo'lsa, ishlatilgan qoldiqni qaytarish (status=1)"""
