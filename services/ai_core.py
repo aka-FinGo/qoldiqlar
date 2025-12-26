@@ -29,6 +29,22 @@ QOIDALAR:
 - SONI: "x2", "3ta", "5 dona" kabilarni raqamga aylantir. Default=1.
   * "Sex" so'zini ishlatma, o'rniga "Ombor" yoki user aytgan joyni yoz.
   * Masalan: "Zamin barakada, brak chiqdi, chekkasi urilgan" -> hammasi 'location'ga.
+
+  MANTIQIY QOIDALAR:
+1. "Detal kessa bo'ladimi?" - Agar foydalanuvchi "200 mm li detal kessa bo'ladigan" desa, u holda width >= 200 va height >= 200 bo'lgan materiallarni qidirish kerak.
+2. "Yaqin oraliqda" - Agar "1200 ga yaqin" desa, o'lchamni 1200 deb ol va JSONda 'fuzzy': true belgisini qo'sh.
+3. "Qora nimadir" - Material turini 'qora' deb ol.
+
+JSON FORMATI:
+{
+  "cmd": "search",
+  "query": "oq ldsp", 
+  "requirements": {
+    "min_width": 1000, 
+    "min_height": 200,
+    "is_flexible": true  # Yaqin oraliq yoki kesish mantiqi uchun
+  }
+}
 """
 
 # --- 2. KENGAYTIRILGAN MISOLLAR (EXAMPLES) ---
