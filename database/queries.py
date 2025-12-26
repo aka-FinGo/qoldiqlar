@@ -31,6 +31,31 @@ def search_remnants(query_text):
     finally:
         conn.close()
 
+
+def get_used_remnants(user_id=None):
+    """Ishlatilgan qoldiqlarni olish (Agar user_id berilsa, faqat o'zinikini)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if user_id:
+            query = "SELECT * FROM remnants WHERE status = 0 AND used_by = %s ORDER BY updated_at DESC"
+            cursor.execute(query, (str(user_id),))
+        else:
+            query = "SELECT * FROM remnants WHERE status = 0 ORDER BY updated_at DESC"
+            cursor.execute(query)
+        return cursor.fetchall()
+    finally: conn.close()
+
+def get_all_active_remnants():
+    """Barcha mavjud (status=1) qoldiqlarni ro'yxat shaklida olish"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM remnants WHERE status = 1 ORDER BY id DESC")
+        return cursor.fetchall()
+    finally: conn.close()
+        
+
 # --- 2. DUBLIKATNI TEKSHIRISH ---
 def check_duplicate(material, width, height, location):
     """Aynan bir xil o'lcham va materialdagi qoldiqni topish"""
