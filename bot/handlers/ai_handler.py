@@ -7,6 +7,7 @@ import database.queries as db
 from config import ADMIN_ID, ADMIN_USERNAME
 from services.gsheets import sync_new_remnant
 from .utils import format_search_results, get_search_keyboard
+from services.search_engine import perform_smart_search
 
 router = Router()
 
