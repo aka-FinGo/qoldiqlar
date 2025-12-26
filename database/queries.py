@@ -236,7 +236,7 @@ def smart_search(query, min_w=0, min_h=0, is_flexible=False):
     try:
         # Asosiy so'rov: material nomi va status bo'yicha
         sql = "SELECT * FROM remnants WHERE (material ILIKE %s OR category ILIKE %s) AND status = 1"
-        params = [f"%{query_text}%", f"%{query_text}%"]
+        params = [f"%{query}%", f"%{query}%"]
 
         # Agar foydalanuvchi detal kessa bo'ladiganini so'ragan bo'lsa
         if min_w > 0 and min_h > 0:
