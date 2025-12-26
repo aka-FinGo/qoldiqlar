@@ -204,11 +204,14 @@ def use_remnant(remnant_id, user_id):
         conn.close()
 
 def restore_remnant(remnant_id):
-    """Xatolik bo'lsa, ishlatilgan qoldiqni qaytarish (status=1)"""
+    """Qoldiqni qayta omborga qo'shish"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE remnants SET status = 1 WHERE id = %s", (remnant_id,))
+        cursor.execute(
+            "UPDATE remnants SET status = 1, used_by = NULL, updated_at = NOW() WHERE id = %s",
+            (remnant_id,)
+        )
         conn.commit()
         return cursor.rowcount > 0
     finally: conn.close()
