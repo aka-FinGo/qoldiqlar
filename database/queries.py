@@ -229,3 +229,27 @@ def get_remnant_details(remnant_id):
         cursor.execute("SELECT * FROM remnants WHERE id = %s", (remnant_id,))
         return cursor.fetchone()
     finally: conn.close()
+
+def smart_search(query_text, min_w=0, min_h=0, is_flexible=False):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Asosiy so'rov: material nomi va status bo'yicha
+        sql = "SELECT * FROM remnants WHERE (material ILIKE %s OR category ILIKE %s) AND status = 1"
+        params = [f"%{query_text}%", f"%{query_text}%"]
+
+        # Agar foydalanuvchi detal kessa bo'ladiganini so'ragan bo'lsa
+        if min_w > 0 and min_h > 0:
+            if is_flexible:
+                # Yaqin oraliqda qidirish (±100 mm farq bilan yoki kattaroq)
+                sql += " AND width >= %s AND height >= %s"
+                params.extend([min_w - 50, min_h - 50])
+            else:
+                # Aniq detal chiqishi kerak bo'lgan holat
+                sql += " AND ((width >= %s AND height >= %s) OR (width >= %s AND height >= %s))"
+                params.extend([min_w, min_h, min_h, min_w]) # Eni va bo'yi almashishi mumkin
+
+        sql += " ORDER BY width * height ASC LIMIT 10" # Eng kichik mos keladigandan boshlab
+        cursor.execute(sql, params)
+        return cursor.fetchall()
+    finally: conn.close()
