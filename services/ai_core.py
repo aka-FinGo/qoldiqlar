@@ -5,57 +5,55 @@ from config import GROQ_API_KEY
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# --- 1. BUYRUQLAR VA QOIDALAR ---
+# --- 1. KOMPLEKS PROMPT (30 yillik tajribaga asoslangan) ---
 INSTRUCTIONS = """
 Sen 30 yillik tajribaga ega, mebel materiallari omborini nazorat qiluvchi professional AI Robotsan.
 Foydalanuvchi xabarlarini tahlil qilib, FAQAT JSON qaytar.
 
 BUYRUQLAR:
-1. "search" - Qidiruv. Foydalanuvchi ma'lum bir materialni, o'lchamni yoki IDni so'rayotgan bo'lsa.
-2. "batch_add" - Qo'shish. Foydalanuvchi yangi qoldiqlar haqida ma'lumot bersa.
+1. "search" - Qidiruv. Material, o'lcham, ID yoki foydalanuvchi tarixini so'raganda.
+2. "batch_add" - Qo'shish. Yangi qoldiqlar haqida ma'lumot berilganda.
 
-MAXSUS QOIDALAR:
-- O'LCHAM: Millimetrda hisobla. Agar user "1.2 metr" desa, uni 1200 deb o'gir.
-- SONI (qty): "1 ta", "5 dona", "x2" kabilarni raqamga aylantir.
-- KATEGORIYA: XDF, MDF, LDSP, Dsp, Akril, LMDF kabilarni material nomidan ajratib ol.
-- BUYURTMA (order): "123_12", "Ali aka", "Oshxona" kabi barcha identifikatorlarni 'order'ga yoz.
-- JOY (location): "Sex" so'zini aslo ishlatma! O'rniga "Ombor" yoki foydalanuvchi aytgan aniq joyni (Zamin baraka, Zamin) yoz.
-- MULTI-ADD: Agar bitta xabarda bir nechta o'lcham yoki material bo'lsa (masalan: "...va 130x120x1ta"), ularni 'items' ro'yxatiga alohida obyekt qilib yoz.
+QOIDALAR:
+- O'LCHAM: Millimetrda hisobla (1.2 metr = 1200). "Uzunlik x Eni" formatida ajrat.
+- MATERIAL: Kategoriya (XDF, LDSP, MDF, Akril) va rangini (Oq, Dub karmen) aniq ajrat.
+- SONI: "x2", "3ta", "5 dona" kabilarni raqamga aylantir. Default=1.
+- BUYURTMA (order): "123_12", "№50", "Ali aka zakazi" kabi identifikatorlarni ajrat.
+- LOKATSIYA VA IZOH (location): O'lcham, material va zakaz raqamidan tashqari barcha so'zlarni (joyi, holati, sababi, brak ekanligi) bitta matn qilib 'location' maydoniga jamla. 
+  * "Sex" so'zini ishlatma, o'rniga "Ombor" yoki user aytgan joyni yoz.
+  * Masalan: "Zamin barakada, brak chiqdi, chekkasi urilgan" -> hammasi 'location'ga.
 """
 
-# --- 2. KENGAYTIRILGAN MISOLLAR ---
+# --- 2. KENGAYTIRILGAN MISOLLAR (EXAMPLES) ---
 EXAMPLES = """
 MISOLLAR:
 
-User: "1200x200x1 ta Oq xdf, 123_12 zakazdan qoldi, Zamin Barakada turibdi"
+User: "1500x1500x1TA xdf oq, Zamin barakada turibdi, 123_12 dan zakazdan qoldi, chekkasi urilgan brak"
 JSON: {
   "cmd": "batch_add",
   "items": [{
-    "category": "XDF", "material": "Oq", "width": 1200, "height": 200, "qty": 1, 
-    "location": "Zamin Baraka", "order": "123_12"
+    "category": "XDF", "material": "Oq", "width": 1500, "height": 1500, "qty": 1, 
+    "order": "123_12", "location": "Zamin baraka, zakazdan qoldi, chekkasi urilgan brak"
   }]
 }
 
-User: "Ldsp dub karmen 16 mm 1300x120 1 ta va 130x120x1ta 123_12 zakazdan, zamin barakada"
+User: "Ldsp dub karmen 16 mm 1300x120 1 ta va 130x120x1ta 123_12 zakazdan, ombor burchagida turibdi"
 JSON: {
   "cmd": "batch_add",
   "items": [
-    { "category": "LDSP", "material": "Dub karmen 16 mm", "width": 1300, "height": 120, "qty": 1, "location": "Zamin baraka", "order": "123_12" },
-    { "category": "LDSP", "material": "Dub karmen 16 mm", "width": 130, "height": 120, "qty": 1, "location": "Zamin baraka", "order": "123_12" }
+    { "category": "LDSP", "material": "Dub karmen 16 mm", "width": 1300, "height": 120, "qty": 1, "order": "123_12", "location": "Ombor burchagida" },
+    { "category": "LDSP", "material": "Dub karmen 16 mm", "width": 130, "height": 120, "qty": 1, "order": "123_12", "location": "Ombor burchagida" }
   ]
 }
 
-User: "1300x1200 detal kessa bo'ladigan xdf bormi?"
-JSON: { "cmd": "search", "query": "XDF 1300x1200" }
+User: "oq mdf qidir 1.2 metrli"
+JSON: { "cmd": "search", "query": "oq mdf 1200" }
 
-User: "id 7 da nima bor?"
-JSON: { "cmd": "search", "query": "#7" }
+User: "id 13 da nima bor?"
+JSON: { "cmd": "search", "query": "#13" }
 
-User: "1.2 metrli ldsp bormi"
-JSON: { "cmd": "search", "query": "LDSP 1200" }
-
-User: "Men qo'shgan qoldiqlar"
-JSON: { "cmd": "search", "query": "my_remnants" }
+User: "Barcha xdflar bormi?"
+JSON: { "cmd": "search", "query": "XDF" }
 """
 
 SYSTEM_PROMPT = INSTRUCTIONS + EXAMPLES
@@ -72,13 +70,10 @@ async def analyze_message(text):
         )
         
         response_text = chat_completion.choices[0].message.content
-        
-        # JSONni qidirib topish va tozalash
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if json_match:
             return json.loads(json_match.group())
-        else:
-            return {"cmd": "error", "msg": "Tushunarsiz buyruq"}
+        return {"cmd": "error", "msg": "Tushunarsiz buyruq"}
         
     except Exception as e:
         print(f"❌ AI Tahlil xatosi: {e}")
