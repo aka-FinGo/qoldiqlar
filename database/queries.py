@@ -3,21 +3,26 @@ from database.connection import get_db_connection
 
 # --- 1. QOLDIQ QIDIRISH (MUKAMMAL QIDIRUV) ---
 def search_remnants(query_text):
-    """Material yoki kategoriya bo'yicha qidirish (Pagination uchun jami ro'yxatni qaytaradi)"""
     conn = get_db_connection()
     if not conn: return []
     cursor = conn.cursor()
     try:
-        # ILIKE - katta-kichik harfni farqlamay qidiradi
+        # Foydalanuvchi "ishlatilgan" deb so'rasa status=0, bo'lmasa status=1
+        status_filter = 0 if "ishlatilgan" in query_text.lower() else 1
+        
+        # Qidiruv so'rovidan "ishlatilgan" so'zini olib tashlaymiz
+        clean_query = query_text.lower().replace("ishlatilgan", "").strip()
+        
         query = """
             SELECT * FROM remnants 
             WHERE (material ILIKE %s OR category ILIKE %s) 
-            AND status = 1
+            AND status = %s
             ORDER BY id DESC
         """
-        cursor.execute(query, (f"%{query_text}%", f"%{query_text}%"))
+        cursor.execute(query, (f"%{clean_query}%", f"%{clean_query}%", status_filter))
         return cursor.fetchall()
     except Exception as e:
+        # Mana shu joyi xatolikni logda ko'rish uchun kerak
         print(f"❌ Qidiruv xatosi: {e}")
         return []
     finally:
