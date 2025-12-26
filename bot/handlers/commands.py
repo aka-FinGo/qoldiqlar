@@ -39,11 +39,22 @@ async def run_background_sync(message):
             except: continue
         remnants = get_all_remnants_from_sheet()
         for r in remnants:
-            try: db.sync_remnant_from_sheet(r[0], r[3], int(r[4]), int(r[5]), int(r[6]), r[9], r[10], int(r[11]))
+            try:
+                # Bazaga yozish: ID, material, height, width, qty, order, location, status
+                db.sync_remnant_from_sheet(
+                    r[0],      # A: ID
+                    r[3],      # D: Material
+                    int(r[4]), # E: Bo'yi
+                    int(r[5]), # F: Eni
+                    int(r[6]), # G: Soni
+                    r[7],      # H: Buyurtma
+                    r[10],     # K: Lokatsiya
+                    int(r[11]) # L: Status
+                )
             except: continue
-        await message.answer("✅ <b>Sinxronlash muvaffaqiyatli yakunlandi!</b>", parse_mode="HTML")
+        await message.answer("✅ Baza to'liq yangilandi!")
     except Exception as e:
-        await message.answer(f"❌ Sinxronlashda xato: {e}")
+        await message.answer(f"❌ Sync error: {e}")
 
 @router.message(F.text.startswith("/view_"))
 async def cmd_view_detail(message: types.Message):
