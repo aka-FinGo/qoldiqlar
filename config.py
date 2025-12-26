@@ -8,6 +8,7 @@ DB_URL = os.getenv("DATABASE_URL")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@admin") # Agar topilmasa @admin bo'ladi
+ADMIN_ID = os.getenv("ADMIN_ID")
 
 # --- KUCHAYTIRILGAN FAYL QIDIRUV ---
 # Renderda fayl odatda shu yerda bo'ladi:
