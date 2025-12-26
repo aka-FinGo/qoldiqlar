@@ -5,103 +5,54 @@ from config import GROQ_API_KEY
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# --- 1. KOMPLEKS PROMPT (30 yillik tajribaga asoslangan) ---
+# --- 1. KOMPLEKS PROMPT ---
 INSTRUCTIONS = """
-Sen 30 yillik tajribaga ega, mebel materiallari omborini nazorat qiluvchi professional AI Robotsan.
+Sen mebel materiallari omborini boshqaruvchi professional AI Robotsan. 
 Foydalanuvchi xabarlarini tahlil qilib, FAQAT JSON qaytar.
 
 BUYRUQLAR:
-1. "search" - Qidiruv. Material, o'lcham, ID yoki foydalanuvchi tarixini so'raganda.
-2. "batch_add" - Qo'shish. Yangi qoldiqlar haqida ma'lumot berilganda.
+1. "search": Qidiruv. "oq mdf", "150x200 detail kessa bo'ladimi", "id 13" kabi so'rovlarda.
+2. "batch_add": Yangi qoldiq qo'shish. O'lcham va material aytilganda.
 
-BUYURTMA RAQAMI (order) QOIDASI:
-- Agar matnda "150_12", "123-55", "№50" yoki "zakazdan" so'zidan oldin/keyin kelgan raqamlar bo'lsa, ularni 'order' maydoniga yoz.
-- BUYURTMA (order): "123_12", "№50", "Ali aka zakazi" kabi identifikatorlarni ajrat.
-- Misol: "150_12 zakazdan qoldi" -> order: "150_12"
+MA'LUMOTLARNI AJRATISH QOIDALARI:
+- O'LCHAM (width, height): Millimetrda. 1.2 metr = 1200. "1500 ga 200" bo'lsa, width=1500, height=200.
+- BUYURTMA (order): "150_12", "123-55", "№50" yoki "zakazdan qoldi" so'zidan oldingi/keyingi kodlar.
+- LOKATSIYA (location): Material va o'lchamdan tashqari barcha izohlar (masalan: "Zamin baraka", "brak", "chekkasi urilgan").
+- MATERIAL: Kategoriya (LDSP, MDF, XDF, Akril) va uning rangi/turi.
 
-LOKATSIYA (location) QOIDASI:
-- Material, o'lcham va orderdan boshqa barcha so'zlarni (masalan: "Zamin baraka", "Ombor", "brak") 'location' maydoniga jamla.
-- LOKATSIYA VA IZOH (location): O'lcham, material va zakaz raqamidan tashqari barcha so'zlarni (joyi, holati, sababi, brak ekanligi) bitta matn qilib 'location' maydoniga jamla. 
-
-QOIDALAR:
-- O'LCHAM: Millimetrda hisobla (1.2 metr = 1200). "Uzunlik x Eni" formatida ajrat.
-- MATERIAL: Kategoriya (XDF, LDSP, MDF, Akril, Dsp) va rangini (Oq, Dub karmen, Qora, antratsit, kashemir, beliy brilliant, snonoviy kost, agt 3019, agt 3020) aniq ajrat.
-- SONI: "x2", "3ta", "5 dona" kabilarni raqamga aylantir. Default=1.
-  * "Sex" so'zini ishlatma, o'rniga "Ombor" yoki user aytgan joyni yoz.
-  * Masalan: "Zamin barakada, brak chiqdi, chekkasi urilgan" -> hammasi 'location'ga.
-
-  MANTIQIY QOIDALAR:
-1. "Detal kessa bo'ladimi?" - Agar foydalanuvchi "200 mm li detal kessa bo'ladigan" desa, u holda width >= 200 va height >= 200 bo'lgan materiallarni qidirish kerak.
-2. "Yaqin oraliqda" - Agar "1200 ga yaqin" desa, o'lchamni 1200 deb ol va JSONda 'fuzzy': true belgisini qo'sh.
-3. "Qora nimadir" - Material turini 'qora' deb ol.
+MANTIQIY QIDIRUV (Requirements):
+- Agar "200 mm li detal kessa bo'ladimi" desa: min_width=200, min_height=200.
+- Agar "1200 ga yaqin" desa: is_flexible=True.
 
 JSON FORMATI:
 {
-  "cmd": "search",
-  "query": "oq ldsp", 
-  "requirements": {
-    "min_width": 1000, 
-    "min_height": 200,
-    "is_flexible": true  # Yaqin oraliq yoki kesish mantiqi uchun
-  }
+  "cmd": "search" | "batch_add",
+  "query": "matn",
+  "requirements": {"min_width": int, "min_height": int, "is_flexible": bool},
+  "items": [{"category": str, "material": str, "width": int, "height": int, "qty": int, "order": str, "location": str}]
 }
 """
 
-# --- 2. KENGAYTIRILGAN MISOLLAR (EXAMPLES) ---
 EXAMPLES = """
-MISOLLAR:
-User: "LDSP OQ 1570x150x1TA QOLDIQ 150_12 ZAKAZDAN QOLDI"
-JSON: {
-  "cmd": "batch_add",
-  "items": [{
-    "category": "LDSP", 
-    "material": "Oq", 
-    "width": 1570, 
-    "height": 150, 
-    "qty": 1, 
-    "order": "150_12", 
-    "location": "Zakazdan qoldi"
-  }]
-}
+User: "LDSP OQ 1570x150x1TA 150_12 zakazdan qoldi, Zamin barakada"
+JSON: {"cmd": "batch_add", "items": [{"category": "LDSP", "material": "Oq", "width": 1570, "height": 150, "qty": 1, "order": "150_12", "location": "Zamin baraka, zakazdan qoldi"}]}
 
-User: "1500x1500x1TA xdf oq, Zamin barakada turibdi, 123_12 dan zakazdan qoldi, chekkasi urilgan brak"
-JSON: {
-  "cmd": "batch_add",
-  "items": [{
-    "category": "XDF", "material": "Oq", "width": 1500, "height": 1500, "qty": 1, 
-    "order": "123_12", "location": "Zamin baraka, zakazdan qoldi, chekkasi urilgan brak"
-  }]
-}
+User: "oq mdf 1200 metrli qidir"
+JSON: {"cmd": "search", "query": "oq mdf 1200"}
 
-User: "Ldsp dub karmen 16 mm 1300x120 1 ta va 130x120x1ta 123_12 zakazdan, ombor burchagida turibdi"
-JSON: {
-  "cmd": "batch_add",
-  "items": [
-    { "category": "LDSP", "material": "Dub karmen 16 mm", "width": 1300, "height": 120, "qty": 1, "order": "123_12", "location": "Ombor burchagida" },
-    { "category": "LDSP", "material": "Dub karmen 16 mm", "width": 130, "height": 120, "qty": 1, "order": "123_12", "location": "Ombor burchagida" }
-  ]
-}
-
-User: "oq mdf qidir 1.2 metrli"
-JSON: { "cmd": "search", "query": "oq mdf 1200" }
-
-User: "id 13 da nima bor?"
-JSON: { "cmd": "search", "query": "#13" }
-
-User: "Barcha xdflar bormi?"
-JSON: { "cmd": "search", "query": "XDF" }
+User: "300x300 detal kessa bo'ladigan qora nimadir bormi?"
+JSON: {"cmd": "search", "query": "qora", "requirements": {"min_width": 300, "min_height": 300, "is_flexible": true}}
 """
-
-SYSTEM_PROMPT = INSTRUCTIONS + EXAMPLES
 
 async def analyze_message(text):
     try:
+        # Model groq/compound ga o'zgartirildi
         chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": INSTRUCTIONS + EXAMPLES},
                 {"role": "user", "content": text}
             ],
-            model="llama-3.3-70b-versatile",
+            model="groq/compound",
             temperature=0.1,
         )
         
@@ -109,8 +60,7 @@ async def analyze_message(text):
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if json_match:
             return json.loads(json_match.group())
-        return {"cmd": "error", "msg": "Tushunarsiz buyruq"}
-        
+        return {"cmd": "error"}
     except Exception as e:
         print(f"❌ AI Tahlil xatosi: {e}")
-        return {"cmd": "error", "msg": str(e)}
+        return {"cmd": "error"}
