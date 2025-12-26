@@ -332,20 +332,34 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
     
     if cmd == 'search':
         req = ai_result.get('requirements', {})
+        query_text = ai_result.get('query', '')
+        
+        # Aqlli qidiruv
         results = db.smart_search(
-            query = ai_result.get('query', ''),
+            query = query_text,
             min_w = req.get('min_width', 0),
             min_h = req.get('min_height', 0),
             is_flexible = req.get('is_flexible', False)
         )
         
         if not results:
-            await message.answer("😔 Afsuski, bu o'lchamdagi detal kessa bo'ladigan material topilmadi.")
+            await message.answer(f"🤷‍♂️ '{query_text}' bo'yicha mos keladigan material topilmadi.")
             return
 
-        text = f"🎯 <b>Sizning o'lchamingizga mos keladiganlar:</b>\n\n"
-        text += format_search_results(results, len(results), 0)
-        await message.answer(text, parse_mode="HTML")
+        # Natija matni
+        text = f"🔍 <b>Qidiruv natijalari:</b> (Jami: {len(results)})\n"
+        if req.get('min_width'):
+            text += f"📏 Kamida {req['min_width']}x{req['min_height']} o'lchamda\n"
+        text += "\n"
+        
+        # Faqat dastlabki 5 tasini ko'rsatamiz
+        text += format_search_results(results[:5], len(results), 0)
+        
+        # Klaviaturani ulash (Pagination ishlashi uchun)
+        # query_text - bu callback dataga yoziladi (masalan: search:xdf:5)
+        kb = get_search_keyboard(query_text, 0, len(results))
+        
+        await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
     
 
