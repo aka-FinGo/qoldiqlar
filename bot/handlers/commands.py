@@ -56,6 +56,7 @@ async def run_background_sync(message):
     except Exception as e:
         await message.answer(f"❌ Sync error: {e}")
 
+
 @router.message(F.text.startswith("/view_"))
 async def cmd_view_detail(message: types.Message):
     try:
@@ -63,19 +64,31 @@ async def cmd_view_detail(message: types.Message):
         item = db.get_remnant_details(r_id)
         if not item: return await message.answer("❌ Ma'lumot topilmadi.")
         
+        # XATONI TUZATISH: O'zgaruvchilarni f-stringdan tashqarida olamiz
+        # Bu eng toza va xatosiz usul
+        location = item.get('location', "Noma'lum") 
+        order = item.get('origin_order', "Yo'q")
+        
         text = (f"📑 <b>Ma'lumot (ID: #{item['id']})</b>\n\n"
                 f"🛠 <b>Material:</b> {item['category']} {item['material']}\n"
                 f"📏 <b>O'lcham:</b> {item['width']}x{item['height']} mm\n"
                 f"📦 <b>Soni:</b> {item['qty']} ta\n"
-                f"🔢 <b>Buyurtma:</b> {item.get('origin_order', 'Yo\'q')}\n"
-                f"📍 <b>Joy:</b> {item.get('location', 'Noma\'lum')}")
+                f"🔢 <b>Buyurtma:</b> {order}\n"
+                f"📍 <b>Joy:</b> {location}") # Endi bu yerda backslash yo'q
         
         from aiogram.utils.keyboard import InlineKeyboardBuilder
         kb = InlineKeyboardBuilder()
+        
         if item['status'] == 1:
             kb.button(text="✅ Ishlatish (Olish)", callback_data=f"use:{item['id']}")
         else:
-            if str(item.get('used_by')) == str(message.from_user.id) or str(message.from_user.id) == str(ADMIN_ID):
+            # Faqat Admin yoki o'sha ishlatgan user qaytara olsin
+            used_by = str(item.get('used_by', ''))
+            current_user = str(message.from_user.id)
+            
+            if used_by == current_user or current_user == str(ADMIN_ID):
                 kb.button(text="🔄 Qaytarib qo'yish", callback_data=f"restore:{item['id']}")
+        
         await message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
-    except Exception as e: print(f"View error: {e}")
+    except Exception as e: 
+        print(f"View error: {e}")
