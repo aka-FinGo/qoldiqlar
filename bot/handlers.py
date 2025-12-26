@@ -202,7 +202,9 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
         
         text = format_search_results(results[:5], len(results), 0)
         kb = get_search_keyboard(query, 0, len(results))
-        await message.answer(text, reply_markup=kb, parse_mode="Markdown")
+        
+        # MUHIM: parse_mode="HTML" bo'lishi shart!
+        await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
     elif cmd == 'batch_add':
         if db_user.get('can_add') == 0:
