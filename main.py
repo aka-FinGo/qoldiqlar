@@ -74,7 +74,10 @@ async def start_web_server():
     app.router.add_get('/api/categories', get_categories)
     app.router.add_post('/api/use', use_remnant)
     app.router.add_post('/api/add', add_remnant)
-    
+    app.router.add_post('/api/edit', edit_remnant)
+app.router.add_post('/api/delete', delete_remnant)
+app.router.add_get('/api/check_admin', check_is_admin)
+
     # 3. Oddiy Health Check (Bot ishlayaptimi yo'qmi bilish uchun)
     app.router.add_get('/', handle_health_check)
 
