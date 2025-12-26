@@ -21,7 +21,7 @@ def get_search_keyboard(query, offset, total_results):
     builder = InlineKeyboardBuilder()
     
     # Orqaga tugmasi (faqat offset 0 dan katta bo'lsa)
-    if offset > 0:
+    if offset >= 5:
         builder.button(text="⬅️ Orqaga", callback_data=f"search:{query}:{max(0, offset-5)}")
     
     # Oldinga tugmasi (agar yana natijalar bo'lsa)
