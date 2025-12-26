@@ -5,7 +5,7 @@ from .ai_handler import router as ai_router
 
 router = Router()
 
-# TARTIB: Oldin buyruqlar, keyin tugmalar, eng oxirida AI tahlilchisi
+# Tartib muhim: Commands -> Callbacks -> AI
 router.include_router(commands_router)
 router.include_router(callbacks_router)
 router.include_router(ai_router)
