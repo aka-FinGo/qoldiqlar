@@ -328,18 +328,26 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
 
     cmd = ai_result.get('cmd')
 
+
+    
     if cmd == 'search':
-        query = ai_result.get('query')
-        results = db.search_remnants(query)
+        req = ai_result.get('requirements', {})
+        results = db.smart_search(
+            query = ai_result.get('query', ''),
+            min_w = req.get('min_width', 0),
+            min_h = req.get('min_height', 0),
+            is_flexible = req.get('is_flexible', False)
+        )
+        
         if not results:
-            await message.answer(f"🤷‍♂️ '{query}' bo'yicha hech narsa topilmadi.")
+            await message.answer("😔 Afsuski, bu o'lchamdagi detal kessa bo'ladigan material topilmadi.")
             return
-        
-        text = format_search_results(results[:5], len(results), 0)
-        kb = get_search_keyboard(query, 0, len(results))
-        
-        # MUHIM: parse_mode="HTML" bo'lishi shart!
-        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+        text = f"🎯 <b>Sizning o'lchamingizga mos keladiganlar:</b>\n\n"
+        text += format_search_results(results, len(results), 0)
+        await message.answer(text, parse_mode="HTML")
+
+    
 
     elif cmd == 'batch_add':
         if db_user.get('can_add') == 0:
