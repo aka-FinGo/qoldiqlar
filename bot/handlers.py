@@ -28,14 +28,19 @@ def get_search_keyboard(query, offset, total_results):
     return builder.as_markup()
 
 def format_search_results(items, total, offset):
-    text = f"🔍 **Natijalar:** (Jami: {total})\n\n"
+    text = f"🔍 <b>Natijalar:</b> (Jami: {total})\n\n"
     for i, item in enumerate(items, 1):
         item_id = item['id']
-        text += (f"{offset + i}. **{item['category']} {item['material']}**\n"
+        title = f"{item['category']} {item['material']}".strip()
+        
+        text += (f"{offset + i}. <b>{title}</b>\n"
                  f"📏 {item['width']}x{item['height']} | 📦 {item['qty']} ta\n"
-                 f"📍 {item['location']} | /view_{item_id}\n"  # Mana bu joyi muhim
+                 f"📍 {item['location']} | /view_{item_id}\n"
                  f"----------------------------\n")
     return text
+
+# Xabarni yuborishda:
+# await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 # --- COMMAND HANDLERS ---
 
