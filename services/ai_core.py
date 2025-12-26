@@ -34,6 +34,19 @@ QOIDALAR:
 # --- 2. KENGAYTIRILGAN MISOLLAR (EXAMPLES) ---
 EXAMPLES = """
 MISOLLAR:
+User: "LDSP OQ 1570x150x1TA QOLDIQ 150_12 ZAKAZDAN QOLDI"
+JSON: {
+  "cmd": "batch_add",
+  "items": [{
+    "category": "LDSP", 
+    "material": "Oq", 
+    "width": 1570, 
+    "height": 150, 
+    "qty": 1, 
+    "order": "150_12", 
+    "location": "Zakazdan qoldi"
+  }]
+}
 
 User: "1500x1500x1TA xdf oq, Zamin barakada turibdi, 123_12 dan zakazdan qoldi, chekkasi urilgan brak"
 JSON: {
