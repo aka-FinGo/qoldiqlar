@@ -19,11 +19,15 @@ class AddState(StatesGroup):
 
 def get_search_keyboard(query, offset, total_results):
     builder = InlineKeyboardBuilder()
-    # Har bir natija uchun "Batafsil" tugmasi o'rniga, natijalar ostida navigatsiya
+    
+    # Orqaga tugmasi (faqat offset 0 dan katta bo'lsa)
     if offset > 0:
-        builder.button(text="⬅️ Orqaga", callback_data=f"search:{query}:{offset-5}")
+        builder.button(text="⬅️ Orqaga", callback_data=f"search:{query}:{max(0, offset-5)}")
+    
+    # Oldinga tugmasi (agar yana natijalar bo'lsa)
     if offset + 5 < total_results:
         builder.button(text="Oldinga ➡️", callback_data=f"search:{query}:{offset+5}")
+    
     builder.adjust(2)
     return builder.as_markup()
 
