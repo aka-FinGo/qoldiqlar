@@ -96,8 +96,11 @@ function renderGrid(data, containerId) {
     if (!container) return;
     container.innerHTML = '';
 
-    if (viewMode === 'grid') container.className = 'grid grid-cols-2 gap-3 pb-24';
-    else container.className = 'flex flex-col gap-3 pb-24';
+    if (viewMode === 'grid') {
+        container.className = 'grid grid-cols-2 gap-3 pb-24';
+    } else {
+        container.className = 'flex flex-col gap-3 pb-24';
+    }
 
     data.forEach(item => {
         const el = document.createElement('div');
@@ -105,39 +108,33 @@ function renderGrid(data, containerId) {
         el.onclick = () => openDetail(item);
         
         const opacity = item.status === 0 ? 'opacity-60 grayscale' : '';
-        const colors = ['bg-blue-50 text-blue-500', 'bg-green-50 text-green-500', 'bg-orange-50 text-orange-500', 'bg-purple-50 text-purple-500'];
+        const colors = ['bg-blue-50', 'bg-green-50', 'bg-orange-50', 'bg-purple-50'];
         const rndColor = colors[item.id % colors.length];
 
-        // API dan qaytgan user_id bilan solishtiramiz
-        const isMine = String(item.user_id) === String(userId);
-        const badge = isMine ? '<i class="fas fa-user text-[10px] text-blue-500 absolute top-1 right-1"></i>' : '';
-
-        const iconHtml = `
-            <div class="${rndColor} flex items-center justify-center ${viewMode === 'list' ? 'w-24 h-full' : 'h-32 w-full'} ${opacity} relative">
-                <i class="fas fa-layer-group text-4xl"></i>
-                ${badge}
+        el.innerHTML = `
+            <div class="${rndColor} flex items-center justify-center ${viewMode === 'list' ? 'w-24 h-full' : 'h-32 w-full'} ${opacity}">
+                <i class="fas fa-layer-group text-3xl text-gray-400"></i>
             </div>
-        `;
-
-        const contentHtml = `
             <div class="p-3 flex-1 flex flex-col justify-between ${opacity}">
                 <div>
-                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-wider border px-1.5 py-0.5 rounded">${item.category || '-'}</span>
-                    <h3 class="font-bold text-sm text-gray-800 leading-tight mt-1 line-clamp-2">${item.material}</h3>
+                    <span class="text-[10px] text-blue-600 font-bold uppercase tracking-wider bg-blue-50 px-1 rounded">${item.category || 'MDF'}</span>
+                    <h3 class="font-bold text-sm text-gray-800 leading-tight mt-1 line-clamp-2">${item.material || 'Nomsiz'}</h3>
                 </div>
                 <div class="mt-2">
-                     <div class="font-extrabold text-lg text-gray-900">${item.width} <span class="text-xs text-gray-400 font-normal">x</span> ${item.height}</div>
+                     <div class="font-extrabold text-lg text-gray-900">
+                        ${item.width || 0} <span class="text-xs text-gray-400 font-normal">x</span> ${item.height || 0}
+                     </div>
                      <div class="flex justify-between items-end mt-1">
-                        <span class="text-xs text-gray-500 font-bold">${item.qty} dona</span>
-                        ${item.location ? `<span class="text-[10px] bg-gray-100 px-1.5 rounded text-gray-600 truncate max-w-[80px]"><i class="fas fa-map-marker-alt"></i> ${item.location}</span>` : ''}
+                        <span class="text-xs text-gray-500 font-bold">${item.qty || 0} dona</span>
+                        ${item.location ? `<span class="text-[10px] text-gray-400 truncate max-w-[70px]"><i class="fas fa-map-marker-alt"></i> ${item.location}</span>` : ''}
                      </div>
                 </div>
             </div>
         `;
-        el.innerHTML = iconHtml + contentHtml;
         container.appendChild(el);
     });
 }
+
 
 function filterCat(btn, cat) {
     document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active', 'bg-blue-600', 'text-white'));
