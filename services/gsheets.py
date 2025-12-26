@@ -69,3 +69,19 @@ def update_sheet_qty(remnant_id, new_qty):
             print(f"✅ Sheetda ID #{remnant_id} soni {new_qty} ga o'zgardi.")
     except Exception as e:
         print(f"❌ Sheet qty update xatosi: {e}")
+
+
+
+def update_sheet_status(remnant_id, status):
+    """Sheetdagi qoldiq holatini (L ustuni) o'zgartiradi (1-bor, 0-ishlatilgan)"""
+    client = get_sheet_client()
+    if not client: return
+    try:
+        sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
+        cell = sheet.find(f"#{remnant_id}")
+        if cell:
+            # L ustuni (12-ustun) status uchun
+            sheet.update_cell(cell.row, 12, status)
+            print(f"✅ Sheetda ID #{remnant_id} statusi {status} ga o'zgardi.")
+    except Exception as e:
+        print(f"❌ Sheet status update xatosi: {e}")
