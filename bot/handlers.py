@@ -3,7 +3,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from services.gsheets import update_sheet_qty
 from services.ai_core import analyze_message
 from services.gsheets import sync_new_user, sync_new_remnant, get_all_users_from_sheet
 import database.queries as db
@@ -87,12 +87,24 @@ async def process_search_pages(callback: types.CallbackQuery):
 async def confirm_add(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     item = data['new_item']
-    new_qty = data['current_qty'] + item['qty']
     
-    # Bazada va Sheetda yangilash (Sheet funksiyasini sync_remnant_from_sheet dan foydalansa bo'ladi)
-    db.update_qty(data['existing_id'], new_qty)
+    # 1. Bazada yangilash va yangi jami sonni olish
+    new_total_qty = db.update_qty(data['existing_id'], item['qty'])
     
-    await callback.message.edit_text(f"✅ Dublikatga qo'shildi! Jami: **{new_qty}** ta.", parse_mode="Markdown")
+    if new_total_qty:
+        # 2. Sheetda ham yangilash
+        update_sheet_qty(data['existing_id'], new_total_qty)
+        
+        await callback.message.edit_text(
+            f"✅ **Soni yangilandi!**\n\nMaterial: {item['material']}\n"
+            f"Eski soni: {data['current_qty']}\n"
+            f"Qo'shildi: {item['qty']}\n"
+            f"Jami: **{new_total_qty}** ta", 
+            parse_mode="Markdown"
+        )
+    else:
+        await callback.message.edit_text("❌ Xatolik yuz berdi.")
+        
     await state.clear()
     await callback.answer()
 
