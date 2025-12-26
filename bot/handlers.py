@@ -30,16 +30,12 @@ def get_search_keyboard(query, offset, total_results):
 def format_search_results(items, total, offset):
     text = f"🔍 **Natijalar:** (Jami: {total})\n\n"
     for i, item in enumerate(items, 1):
-        # Material nomini chiroyli yozish
-        title = f"{item['category']} {item['material']}".strip()
-        
-        # ID qismini bosiladigan havola (command) ko'rinishida yozamiz
-        text += (f"{offset + i}. **{title}**\n"
+        item_id = item['id']
+        text += (f"{offset + i}. **{item['category']} {item['material']}**\n"
                  f"📏 {item['width']}x{item['height']} | 📦 {item['qty']} ta\n"
-                 f"📍 {item['location']} | /view_{item['id']}\n"
+                 f"📍 {item['location']} | /view_{item_id}\n"  # Mana bu joyi muhim
                  f"----------------------------\n")
     return text
-
 
 # --- COMMAND HANDLERS ---
 
