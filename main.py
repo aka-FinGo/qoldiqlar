@@ -73,8 +73,15 @@ async def main():
 
     logger.info("🚀 Bot polling boshlandi...")
     try:
-        await bot.delete_webhook(drop_pending_updates=True)
+        # Tarmoq xatosi bo'lsa ham bot o'chib qolmasligi uchun
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+        except Exception as e:
+            logger.warning(f"Webhook o'chirishda xato (e'tiborsiz qoldiring): {e}")
+
         await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"Polling xatosi: {e}")
     finally:
         await bot.session.close()
 
