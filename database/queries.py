@@ -204,17 +204,22 @@ def use_remnant(remnant_id, user_id):
         conn.close()
 
 def restore_remnant(remnant_id):
-    """Qoldiqni qayta omborga qo'shish"""
     conn = get_db_connection()
+    if not conn: return False
     cursor = conn.cursor()
     try:
+        # Statusni 1 qilamiz, used_by ni NULL qilamiz
         cursor.execute(
             "UPDATE remnants SET status = 1, used_by = NULL, updated_at = NOW() WHERE id = %s",
             (remnant_id,)
         )
         conn.commit()
         return cursor.rowcount > 0
-    finally: conn.close()
+    except Exception as e:
+        print(f"❌ DB restore error: {e}")
+        return False
+    finally:
+        conn.close()
 
 def get_remnant_details(remnant_id):
     """ID bo'yicha to'liq ma'lumotni olish"""
