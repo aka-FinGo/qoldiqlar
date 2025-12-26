@@ -91,40 +91,32 @@ async function loadCategories() {
 }
 
 // --- RENDER ---
-// script.js ichidagi renderGrid funksiyasini shunga almashtiring
 function renderGrid(data, containerId) {
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container || !Array.isArray(data)) return;
     container.innerHTML = '';
-
-    // data massiv ekanligini tekshiramiz
-    if (!Array.isArray(data)) return;
 
     data.forEach(item => {
         const el = document.createElement('div');
-        el.className = `card p-0 relative active:scale-95 transition-transform overflow-hidden ${viewMode === 'list' ? 'flex flex-row h-24' : 'flex flex-col'}`;
+        el.className = `card p-0 active:scale-95 transition-transform overflow-hidden flex flex-col`;
         el.onclick = () => openDetail(item);
         
-        // Bazadagi ustun nomlariga aniq murojaat
-        const matName = item.material || 'Nomsiz';
-        const catName = item.category || 'MDF';
-        const w = item.width || 0;
-        const h = item.height || 0;
-        const q = item.qty || 0;
+        // Bazadan kelayotgan nomlarni tekshirib olamiz
+        const material = item.material || 'Nomaʼlum';
+        const category = item.category || 'MDF';
+        const width = item.width || 0;
+        const height = item.height || 0;
+        const qty = item.qty || 0;
 
         el.innerHTML = `
-            <div class="bg-blue-50 flex items-center justify-center ${viewMode === 'list' ? 'w-24 h-full' : 'h-32 w-full'}">
-                <i class="fas fa-layer-group text-3xl text-blue-200"></i>
+            <div class="bg-gray-100 h-32 flex items-center justify-center text-gray-300">
+                <i class="fas fa-layer-group text-4xl"></i>
             </div>
-            <div class="p-3 flex-1 flex flex-col justify-between">
-                <div>
-                    <span class="text-[10px] text-blue-500 font-bold uppercase border px-1 rounded">${catName}</span>
-                    <h3 class="font-bold text-sm text-gray-800 leading-tight mt-1">${matName}</h3>
-                </div>
-                <div class="mt-2">
-                     <div class="font-extrabold text-lg text-gray-900">${w} x ${h}</div>
-                     <div class="text-xs text-gray-500 font-bold">${q} dona</div>
-                </div>
+            <div class="p-3">
+                <span class="text-[10px] text-blue-500 font-bold uppercase border px-1 rounded">${category}</span>
+                <h3 class="font-bold text-sm text-gray-800 mt-1 line-clamp-1">${material}</h3>
+                <div class="font-extrabold text-lg mt-1">${width} x ${height}</div>
+                <div class="text-xs text-gray-500">${qty} dona</div>
             </div>
         `;
         container.appendChild(el);
