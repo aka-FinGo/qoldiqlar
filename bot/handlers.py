@@ -7,7 +7,8 @@ from services.gsheets import update_sheet_qty
 from services.ai_core import analyze_message
 from services.gsheets import sync_new_user, sync_new_remnant, get_all_users_from_sheet
 import database.queries as db
-from config import ADMIN_USERNAME
+
+from config import ADMIN_ID, ADMIN_USERNAME
 
 router = Router()
 
