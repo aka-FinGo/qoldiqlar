@@ -99,13 +99,24 @@ async def process_search_pages(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("use:"))
 async def process_use(callback: types.CallbackQuery, bot: Bot):
-    r_id = int(callback.data.split(":")[1])
-    if db.use_remnant(r_id, callback.from_user.id):
-        update_sheet_status(r_id, 0)
-        await callback.message.edit_text(f"📉 ID #{r_id} ishlatilgan deb belgilandi.")
+    try:
+        r_id = int(callback.data.split(":")[1])
+        # Bazada statusni yangilash
+        success = db.use_remnant(r_id, callback.from_user.id)
         
-        if str(callback.from_user.id) != str(ADMIN_ID):
-            await bot.send_message(ADMIN_ID, f"📉 **Qoldiq ishlatildi!**\nID: #{r_id}\nKim: {callback.from_user.full_name}")
+        if success:
+            # Sheetda yangilash
+            update_sheet_status(r_id, 0)
+            await callback.message.edit_text(f"📉 ID #{r_id} ishlatilgan deb belgilandi.")
+            
+            # Adminga xabar
+            if str(callback.from_user.id) != str(ADMIN_ID):
+                await bot.send_message(ADMIN_ID, f"📉 <b>Qoldiq ishlatildi!</b>\nID: #{r_id}\nKim: {callback.from_user.full_name}", parse_mode="HTML")
+        else:
+            await callback.answer("❌ Xatolik: Qoldiq topilmadi yoki allaqachon ishlatilgan.")
+    except Exception as e:
+        print(f"❌ Use callback error: {e}")
+        await callback.answer("❌ Tizim xatosi")
     await callback.answer()
 
 @router.callback_query(F.data == "confirm_add", AddState.waiting_confirm)
