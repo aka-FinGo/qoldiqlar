@@ -1,7 +1,7 @@
 const tg = window.Telegram.WebApp;
 tg.expand(); 
 
-// Fallback ID (Agar Telegramdan tashqarida ochilsa)
+// Fallback (Test)
 const user = tg.initDataUnsafe?.user || { id: 380004653, first_name: "Test User" };
 const userId = user.id;
 
@@ -11,13 +11,11 @@ let isAdmin = false;
 let viewMode = 'grid'; 
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Ismni qo'yish
     if(document.getElementById('userName')) {
         document.getElementById('userName').innerText = user.first_name;
         document.getElementById('userIdDisp').innerText = `ID: ${user.id}`;
     }
 
-    // Admin tekshiruvi
     try {
         const res = await fetch(`/api/check_admin?user_id=${userId}`);
         const data = await res.json();
@@ -25,13 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(isAdmin && document.getElementById('adminPanel')) {
             document.getElementById('adminPanel').classList.remove('hidden');
         }
-    } catch(e) { console.log("Admin check fail"); }
+    } catch(e) {}
 
     await loadCategories();
     await fetchData('all');
 });
 
-// --- DATA OLISH ---
+// --- DATA ---
 async function fetchData(type = 'all') {
     const loader = document.getElementById('loader');
     const list = document.getElementById(type === 'all' ? 'remnantsList' : 'profileList');
@@ -43,7 +41,6 @@ async function fetchData(type = 'all') {
 
     try {
         let url = `/api/remnants?user_id=${userId}&type=${type}`;
-        // Agar kategoriya tanlangan bo'lsa (faqat Bosh sahifada)
         if (type === 'all') {
             const activeCat = document.querySelector('.cat-pill.active');
             if (activeCat && activeCat.innerText !== 'Barchasi') {
@@ -54,18 +51,12 @@ async function fetchData(type = 'all') {
         const res = await fetch(url);
         const data = await res.json();
 
-        // --- TUZATILGAN QISM: Error tekshiruvi ---
         if (data.error) {
-            alert("Server Xatosi: " + data.error);
-            return;
-        }
-        if (!Array.isArray(data)) {
-            itemsData = [];
-        } else {
-            itemsData = data;
+            alert("Xatolik: " + data.error);
+            return; 
         }
 
-        // Render
+        itemsData = Array.isArray(data) ? data : [];
         const containerId = (type === 'all') ? 'remnantsList' : 'profileList';
         renderGrid(itemsData, containerId);
 
@@ -82,15 +73,9 @@ async function loadCategories() {
     try {
         const res = await fetch('/api/categories');
         const cats = await res.json();
-        
-        // Agar xato bo'lsa yoki bo'sh bo'lsa
         if (!Array.isArray(cats)) return;
 
         const cont = document.getElementById('categoryFilter');
-        // Faqat "Barchasi" tugmasi qolmasligi uchun tozalab tashlash ham mumkin, 
-        // lekin biz append qilamiz.
-        
-        // Eski dinamik tugmalarni o'chiramiz (faqat birinchisi qoladi)
         while (cont.children.length > 1) {
             cont.removeChild(cont.lastChild);
         }
@@ -102,7 +87,7 @@ async function loadCategories() {
             btn.onclick = function() { filterCat(this, c); };
             cont.appendChild(btn);
         });
-    } catch(e) { console.log("Cat error", e); }
+    } catch(e) {}
 }
 
 // --- RENDER ---
@@ -111,83 +96,67 @@ function renderGrid(data, containerId) {
     if (!container) return;
     container.innerHTML = '';
 
-    // View mode classlari
-    if (viewMode === 'grid') {
-        container.className = 'grid grid-cols-2 gap-3 pb-24';
-    } else {
-        container.className = 'flex flex-col gap-3 pb-24';
-    }
+    if (viewMode === 'grid') container.className = 'grid grid-cols-2 gap-3 pb-24';
+    else container.className = 'flex flex-col gap-3 pb-24';
 
     data.forEach(item => {
         const el = document.createElement('div');
         el.className = `card p-0 relative active:scale-95 transition-transform overflow-hidden ${viewMode === 'list' ? 'flex flex-row h-24' : 'flex flex-col'}`;
         el.onclick = () => openDetail(item);
         
-        // Agar status=0 bo'lsa (Ishlatilgan), xira qilamiz
         const opacity = item.status === 0 ? 'opacity-60 grayscale' : '';
-
-        // Random rangli icon (rasm o'rniga)
-        const colors = ['bg-blue-100 text-blue-500', 'bg-green-100 text-green-500', 'bg-yellow-100 text-yellow-600', 'bg-purple-100 text-purple-500'];
+        const colors = ['bg-blue-50 text-blue-500', 'bg-green-50 text-green-500', 'bg-orange-50 text-orange-500', 'bg-purple-50 text-purple-500'];
         const rndColor = colors[item.id % colors.length];
 
+        // API dan qaytgan user_id bilan solishtiramiz
+        const isMine = String(item.user_id) === String(userId);
+        const badge = isMine ? '<i class="fas fa-user text-[10px] text-blue-500 absolute top-1 right-1"></i>' : '';
+
         const iconHtml = `
-            <div class="${rndColor} flex items-center justify-center ${viewMode === 'list' ? 'w-24 h-full' : 'h-28 w-full'} ${opacity}">
-                <i class="fas fa-layer-group text-3xl"></i>
+            <div class="${rndColor} flex items-center justify-center ${viewMode === 'list' ? 'w-24 h-full' : 'h-32 w-full'} ${opacity} relative">
+                <i class="fas fa-layer-group text-4xl"></i>
+                ${badge}
             </div>
         `;
 
         const contentHtml = `
             <div class="p-3 flex-1 flex flex-col justify-between ${opacity}">
                 <div>
-                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-wider border px-1 rounded">${item.category || 'Noma\'lum'}</span>
+                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-wider border px-1.5 py-0.5 rounded">${item.category || '-'}</span>
                     <h3 class="font-bold text-sm text-gray-800 leading-tight mt-1 line-clamp-2">${item.material}</h3>
                 </div>
                 <div class="mt-2">
                      <div class="font-extrabold text-lg text-gray-900">${item.width} <span class="text-xs text-gray-400 font-normal">x</span> ${item.height}</div>
                      <div class="flex justify-between items-end mt-1">
-                        <span class="text-xs text-gray-500">${item.qty} dona</span>
-                        ${item.location ? `<span class="text-[10px] bg-gray-100 px-1 rounded text-gray-600 truncate max-w-[80px]"><i class="fas fa-map-marker-alt"></i> ${item.location}</span>` : ''}
+                        <span class="text-xs text-gray-500 font-bold">${item.qty} dona</span>
+                        ${item.location ? `<span class="text-[10px] bg-gray-100 px-1.5 rounded text-gray-600 truncate max-w-[80px]"><i class="fas fa-map-marker-alt"></i> ${item.location}</span>` : ''}
                      </div>
                 </div>
             </div>
         `;
-
         el.innerHTML = iconHtml + contentHtml;
         container.appendChild(el);
     });
 }
 
-// --- FILTER & TABS ---
 function filterCat(btn, cat) {
-    // Hamma knopkadan active ni olib tashlash
     document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active', 'bg-blue-600', 'text-white'));
-    // Bosilganiga qo'shish
     btn.classList.add('active', 'bg-blue-600', 'text-white');
-    
     fetchData('all');
 }
 
 function toggleView() {
     viewMode = viewMode === 'grid' ? 'list' : 'grid';
     document.getElementById('viewIcon').className = viewMode === 'grid' ? 'fas fa-th-large text-xl' : 'fas fa-list text-xl';
-    
-    // Qaysi tabdaligiga qarab refresh
     const isProfile = !document.getElementById('profilePage').classList.contains('hidden');
-    if (isProfile) {
-        // Profil ichida tabni aniqlash qiyinroq, shunchaki qayta render
-        renderGrid(itemsData, 'profileList');
-    } else {
-        renderGrid(itemsData, 'remnantsList');
-    }
+    renderGrid(itemsData, isProfile ? 'profileList' : 'remnantsList');
 }
 
 function switchTab(tab) {
-    // Nav button styles
     document.querySelectorAll('.nav-item').forEach(el => {
         el.classList.remove('active', 'text-blue-600');
         el.classList.add('text-gray-400');
     });
-    
     const activeBtn = document.getElementById(`nav-${tab}`);
     if(activeBtn) {
         activeBtn.classList.add('active', 'text-blue-600');
@@ -208,24 +177,17 @@ function switchTab(tab) {
 }
 
 function switchProfileTab(ptab) {
-    // Style update
     const btnMine = document.getElementById('ptab-mine');
     const btnUsed = document.getElementById('ptab-used');
-    
     const activeClass = "flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow text-gray-800 transition";
     const inactiveClass = "flex-1 py-2 text-sm font-bold rounded-lg text-gray-500 hover:bg-gray-200 transition";
 
-    if (ptab === 'mine') {
-        btnMine.className = activeClass;
-        btnUsed.className = inactiveClass;
-    } else {
-        btnMine.className = inactiveClass;
-        btnUsed.className = activeClass;
-    }
+    if (ptab === 'mine') { btnMine.className = activeClass; btnUsed.className = inactiveClass; } 
+    else { btnMine.className = inactiveClass; btnUsed.className = activeClass; }
     fetchData(ptab);
 }
 
-// --- MODALS & ACTIONS ---
+// --- MODALS ---
 function openDetail(item) {
     selectedItem = item;
     document.getElementById('d-material').innerText = item.material;
@@ -235,51 +197,33 @@ function openDetail(item) {
     document.getElementById('d-order').innerText = item.origin_order || '-';
     document.getElementById('d-location').innerText = item.location || '-';
     
-    // Admin buttons logic
     const adminActions = document.getElementById('adminActions');
+    // API endi user_id ni to'g'ri qaytaradi, shuning uchun solishtirish ishlaydi
     if (isAdmin || String(item.user_id) === String(userId)) {
         adminActions.classList.remove('hidden');
     } else {
         adminActions.classList.add('hidden');
     }
 
-    // Ishlatish tugmasi faqat aktiv bo'lsa chiqsin
     const btnUse = document.getElementById('btnUse');
-    if (item.status === 0) {
-        btnUse.classList.add('hidden');
-    } else {
-        btnUse.classList.remove('hidden');
-    }
+    if (item.status === 0) btnUse.classList.add('hidden');
+    else btnUse.classList.remove('hidden');
     
     document.getElementById('detailModal').classList.remove('hidden');
 }
 
 async function useItem() {
     if(!selectedItem) return;
-    if(!confirm("Haqiqatan ham ishlatmoqchimisiz?")) return;
-    
-    await fetch('/api/use', {
-        method: 'POST',
-        body: JSON.stringify({id: selectedItem.id, user_id: userId})
-    });
-    
+    if(!confirm("Ishlatishni tasdiqlaysizmi?")) return;
+    await fetch('/api/use', { method: 'POST', body: JSON.stringify({id: selectedItem.id, user_id: userId}) });
     closeModal('detailModal');
     tg.HapticFeedback.notificationOccurred('success');
-    
-    // Qayta yuklash
     const isProfile = !document.getElementById('profilePage').classList.contains('hidden');
-    if(isProfile) {
-        // Profilni qaysi tabida turgan bo'lsa o'sha yerni yangilash
-        const isUsedTab = document.getElementById('ptab-used').classList.contains('shadow');
-        fetchData(isUsedTab ? 'used' : 'mine');
-    } else {
-        fetchData('all');
-    }
+    fetchData(isProfile ? (document.getElementById('ptab-used').classList.contains('shadow') ? 'used' : 'mine') : 'all');
 }
 
 function editItem() {
     closeModal('detailModal');
-    // Fill Form
     document.getElementById('editId').value = selectedItem.id;
     document.getElementById('inpCat').value = selectedItem.category;
     document.getElementById('inpMat').value = selectedItem.material;
@@ -289,14 +233,11 @@ function editItem() {
     document.getElementById('inpOrd').value = selectedItem.origin_order || '';
     document.getElementById('inpLoc').value = selectedItem.location || '';
     document.getElementById('btnSave').innerText = "Yangilash";
-    
     openModal('addModal');
 }
 
 async function deleteItem() {
-    if(!selectedItem) return;
-    if(!confirm("O'chirib yuborilsinmi? Tiklab bo'lmaydi!")) return;
-    
+    if(!selectedItem || !confirm("O'chirib yuborilsinmi?")) return;
     await fetch('/api/delete', { method: 'POST', body: JSON.stringify({id: selectedItem.id}) });
     closeModal('detailModal');
     fetchData('all');
@@ -308,46 +249,29 @@ async function submitAdd(e) {
     const data = Object.fromEntries(formData.entries());
     data.user_id = userId;
     
-    // Edit or Add?
     const url = data.id ? '/api/edit' : '/api/add';
     
     try {
         const res = await fetch(url, { method: 'POST', body: JSON.stringify(data) });
         const result = await res.json();
-        
-        if(result.error) {
-            alert("Xatolik: " + result.error);
-        } else {
+        if(result.error) alert("Xatolik: " + result.error);
+        else {
             e.target.reset();
             document.getElementById('editId').value = ''; 
             document.getElementById('btnSave').innerText = "Saqlash";
             closeModal('addModal');
             tg.HapticFeedback.notificationOccurred('success');
-            
-            // Profilga o'tib "Qo'shganlarim"ni ochamiz
-            switchTab('profile');
+            if(data.id) fetchData('all'); 
+            else switchTab('profile');
         }
-    } catch(err) {
-        alert("Serverga ulanishda xato!");
-    }
+    } catch(err) { alert("Server xatosi!"); }
 }
 
 function openModal(id) { 
-    if(id==='addModal') { 
-        // Agar edit bo'lmasa tozalash
-        if(document.getElementById('btnSave').innerText !== "Yangilash") {
-            document.getElementById('addForm').reset(); 
-            document.getElementById('editId').value = '';
-        }
+    if(id==='addModal' && document.getElementById('btnSave').innerText !== "Yangilash") {
+        document.getElementById('addForm').reset(); 
+        document.getElementById('editId').value = '';
     }
     document.getElementById(id).classList.remove('hidden'); 
 }
-function closeModal(id) { 
-    document.getElementById(id).classList.add('hidden'); 
-    // Agar AddModal yopilsa, formani tozalab qo'yish yaxshi (Edit rejimidan chiqish uchun)
-    if(id === 'addModal') {
-        document.getElementById('addForm').reset();
-        document.getElementById('editId').value = '';
-        document.getElementById('btnSave').innerText = "Saqlash";
-    }
-}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
