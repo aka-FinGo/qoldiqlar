@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('userName').innerText = user.first_name;
     document.getElementById('userIdDisp').innerText = `ID: ${user.id}`;
 
-    // Adminligini tekshirish
     try {
         const res = await fetch(`/api/check_admin?user_id=${userId}`);
         const data = await res.json();
@@ -66,7 +65,6 @@ function renderGrid(data, containerId) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     
-    // Grid/List rejimi
     if (viewMode === 'grid') {
         container.className = 'grid grid-cols-2 gap-3 pb-24';
     } else {
@@ -78,14 +76,12 @@ function renderGrid(data, containerId) {
         el.className = `card p-0 relative active:scale-95 transition-transform overflow-hidden ${viewMode === 'list' ? 'flex flex-row' : 'flex flex-col'}`;
         el.onclick = () => openDetail(item);
         
-        // Rasm o'rniga rangli icon
         const iconHtml = `
             <div class="bg-gray-100 flex items-center justify-center text-gray-300 ${viewMode === 'list' ? 'w-24 h-full' : 'h-28 w-full'}">
                 <i class="fas fa-layer-group text-3xl"></i>
             </div>
         `;
 
-        // Matn qismi
         const contentHtml = `
             <div class="p-3 flex-1 flex flex-col justify-between">
                 <div>
@@ -172,7 +168,6 @@ function openDetail(item) {
     document.getElementById('d-order').innerText = item.origin_order || '-';
     document.getElementById('d-location').innerText = item.location || '-';
     
-    // Admin buttons
     if (isAdmin || item.user_id == userId) {
         document.getElementById('adminActions').classList.remove('hidden');
     } else {
@@ -193,10 +188,8 @@ async function useItem() {
     fetchData();
 }
 
-// --- ADD / EDIT ---
 function editItem() {
     closeModal('detailModal');
-    // Formani to'ldirish
     document.getElementById('editId').value = selectedItem.id;
     document.getElementById('inpCat').value = selectedItem.category;
     document.getElementById('inpMat').value = selectedItem.material;
@@ -223,7 +216,6 @@ async function submitAdd(e) {
     const data = Object.fromEntries(formData.entries());
     data.user_id = userId;
     
-    // Agar ID bor bo'lsa -> Edit, bo'lmasa -> Add
     const url = data.id ? '/api/edit' : '/api/add';
     
     await fetch(url, { method: 'POST', body: JSON.stringify(data) });
