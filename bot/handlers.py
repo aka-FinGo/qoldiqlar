@@ -131,18 +131,21 @@ async def show_item_details(message: types.Message, r_id: int):
         await message.answer("❌ Topilmadi.")
         return
 
-    # Sanani f-stringdan tashqarida tayyorlab olamiz (Xatolikni oldini olish uchun)
+    # Ma'lumotlarni tayyorlash
     created_date = item['created_at'].strftime('%d.%m.%Y %H:%M')
-    order_val = item['origin_order'] if item['origin_order'] else "Yo'q"
+    # HTML formatida maxsus belgilarni xavfsiz qilish uchun:
+    order_val = str(item['origin_order']) if item['origin_order'] else "Yo'q"
+    location_val = str(item['location']) if item['location'] else "Noma'lum"
 
-    text = (f"📑 **To'liq ma'lumot (ID: #{item['id']})**\n\n"
-            f"🛠 **Material:** {item['category']} {item['material']}\n"
-            f"📏 **O'lcham:** {item['width']}x{item['height']} mm\n"
-            f"📦 **Soni:** {item['qty']} ta\n"
-            f"🔢 **Buyurtma:** {order_val}\n"
-            f"📍 **Izoh/Joy:** {item['location']}\n"
-            f"👤 **Qo'shdi:** {item['created_by_name']}\n"
-            f"📅 **Sana:** {created_date}")
+    # HTML formatida xabar matni
+    text = (f"📑 <b>To'liq ma'lumot (ID: #{item['id']})</b>\n\n"
+            f"🛠 <b>Material:</b> {item['category']} {item['material']}\n"
+            f"📏 <b>O'lcham:</b> {item['width']}x{item['height']} mm\n"
+            f"📦 <b>Soni:</b> {item['qty']} ta\n"
+            f"🔢 <b>Buyurtma:</b> {order_val}\n"
+            f"📍 <b>Izoh/Joy:</b> {location_val}\n"
+            f"👤 <b>Qo'shdi:</b> {item['created_by_name']}\n"
+            f"📅 <b>Sana:</b> {created_date}")
     
     kb = InlineKeyboardBuilder()
     if item['status'] == 1:
@@ -151,7 +154,8 @@ async def show_item_details(message: types.Message, r_id: int):
         kb.button(text="🔄 Qaytarib qo'yish", callback_data=f"restore:{item['id']}")
     kb.adjust(1)
     
-    await message.answer(text, reply_markup=kb.as_markup(), parse_mode="Markdown")
+    # MUHIM: parse_mode="HTML" bo'lishi kerak
+    await message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
 
 @router.message(F.text)
 async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
