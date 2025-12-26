@@ -50,15 +50,35 @@ def format_search_results(items, total, offset):
 
 @router.callback_query(F.data.startswith("search:"))
 async def process_search_pages(callback: types.CallbackQuery):
-    _, query, offset = callback.data.split(":")
-    offset = int(offset)
-    results = db.search_remnants(query)
+    try:
+        # Callback datadan ma'lumotlarni olamiz: search:query:offset
+        parts = callback.data.split(":")
+        if len(parts) < 3:
+            return
+            
+        query = parts[1]
+        offset = int(parts[2])
+        
+        # Bazadan yangi offset bo'yicha ma'lumotlarni olamiz
+        results = db.search_remnants(query)
+        
+        if not results:
+            await callback.answer("Natijalar topilmadi.")
+            return
+
+        # Matn va klaviaturani yangilaymiz
+        text = format_search_results(results[offset:offset+5], len(results), offset)
+        kb = get_search_keyboard(query, offset, len(results))
+        
+        # Xabarni tahrirlaymiz (Markdown o'rniga HTML ishlatgan bo'lsangiz parse_mode="HTML" qiling)
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        
+    except Exception as e:
+        print(f"❌ Pagination error: {e}")
+        await callback.answer("Xatolik yuz berdi")
     
-    text = format_search_results(results[offset:offset+5], len(results), offset)
-    kb = get_search_keyboard(query, offset, len(results))
-    
-    await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
+    
 
 @router.callback_query(F.data.startswith("use:"))
 async def process_use(callback: types.CallbackQuery, bot: Bot):
