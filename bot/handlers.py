@@ -64,17 +64,19 @@ async def process_search_pages(callback: types.CallbackQuery):
 async def process_use(callback: types.CallbackQuery, bot: Bot):
     try:
         # 1. IDni ajratib olamiz
-        data_parts = callback.data.split(":")
-        r_id = int(data_parts[1])
+        r_id = int(callback.data.split(":")[1])
+        print(f"DEBUG: Ishlatish so'raldi ID={r_id}, User={callback.from_user.id}")
+        
+        success = db.use_remnant(r_id, callback.from_user.id)
         
         # 2. Bazada statusni 0 qilamiz
         # queries.py dagi use_remnant(r_id, user_id) chaqiriladi
-        success = db.use_remnant(r_id, callback.from_user.id)
         
         if success:
             # 3. Google Sheetda ham statusni 0 qilamiz
             try:
                 update_sheet_status(r_id, 0)
+                await callback.message.edit_text(f"📉 <b>ID #{r_id}</b> ishlatilgan deb belgilandi.", parse_mode="HTML")
             except Exception as e:
                 print(f"⚠️ Sheet update error (lekin baza yangilandi): {e}")
 
