@@ -159,13 +159,75 @@ async def cmd_start(message: types.Message):
 
     await message.answer("👋 Xush kelibsiz! Material qidirish yoki qo'shish uchun xabar yozing.")
 
+# --- YANGI BUYRUQLAR: /ishlatilganlar, /men_ishlatganlarim, /list ---
+
+@router.message(Command("ishlatilganlar"))
+async def cmd_all_used(message: types.Message):
+    items = db.get_used_remnants() # Hammaniki
+    if not items:
+        return await message.answer("📭 Ishlatilgan qoldiqlar hali yo'q.")
+    
+    text = "📂 <b>Barcha ishlatilgan qoldiqlar:</b>\n\n"
+    text += format_search_results(items[:10], len(items), 0)
+    await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("men_ishlatganlarim"))
+async def cmd_my_used(message: types.Message):
+    items = db.get_used_remnants(user_id=message.from_user.id)
+    if not items:
+        return await message.answer("📭 Siz hali qoldiq ishlatmagansiz.")
+    
+    text = "👤 <b>Siz ishlatgan qoldiqlar:</b>\n\n"
+    text += format_search_results(items[:10], len(items), 0)
+    await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("list"))
+async def cmd_list_all(message: types.Message):
+    items = db.get_all_active_remnants()
+    if not items:
+        return await message.answer("📭 Omborda qoldiq mavjud emas.")
+    
+    text = f"📋 <b>Mavjud qoldiqlar ro'yxati</b> (Jami: {len(items)} ta):\n\n"
+    # Ro'yxat juda uzun bo'lsa, birinchi 20 tasini ko'rsatamiz
+    text += format_search_results(items[:20], len(items), 0)
+    await message.answer(text, parse_mode="HTML")
+    
+
+# --- QAYTARIB QO'YISH TUGMASI LOGIKASI ---
+
 @router.message(F.text.startswith("/view_"))
 async def cmd_view_detail(message: types.Message):
     try:
         r_id = int(message.text.split("_")[1])
-        await show_item_details(message, r_id)
-    except:
-        await message.answer("❌ Noto'g'ri ID")
+        item = db.get_remnant_details(r_id)
+        
+        if not item:
+            return await message.answer("❌ Ma'lumot topilmadi.")
+
+        created_date = item['created_at'].strftime('%d.%m.%Y %H:%M')
+        text = (f"📑 <b>Ma'lumot (ID: #{item['id']})</b>\n\n"
+                f"🛠 <b>Material:</b> {item['category']} {item['material']}\n"
+                f"📏 <b>O'lcham:</b> {item['width']}x{item['height']} mm\n"
+                f"📦 <b>Soni:</b> {item['qty']} ta\n"
+                f"👤 <b>Qo'shdi:</b> {item['created_by_name']}\n"
+                f"📅 <b>Sana:</b> {created_date}\n")
+        
+        kb = InlineKeyboardBuilder()
+        
+        if item['status'] == 1:
+            kb.button(text="✅ Ishlatish (Olish)", callback_data=f"use:{item['id']}")
+        else:
+            text += f"\n⚠️ <b>Holat:</b> Ishlatilgan"
+            # FAQAT ISHLATGAN ODAM YOKI ADMIN QAYTARA OLADI
+            if str(item['used_by']) == str(message.from_user.id) or str(message.from_user.id) == str(ADMIN_ID):
+                kb.button(text="🔄 Qaytarib qo'yish", callback_data=f"restore:{item['id']}")
+            else:
+                text += f"\n👤 <b>Kim tomonidan:</b> Boshqa ishchi"
+
+        await message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+    except Exception as e:
+        print(f"View error: {e}")
+
 
 @router.message(Command("sync"))
 async def cmd_sync(message: types.Message):
