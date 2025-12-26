@@ -23,7 +23,8 @@ MUHIM QOIDALAR (Qo'shish uchun):
    - "Oq XDF" -> Category="XDF", Material="Oq"
    - "Mokko" -> Category="LDSP" (Default)
    - "MDF", "LMDF", "Akril" so'zlari bu Kategoriya.
-4. ORDER (Zakaz): "123-zakaz", "123_12", "Ali aka uchun" kabi gaplarni 'order' ga yoz.
+4. ORDER (Zakaz): "123-zakaz", "123_12", "55-55" kabi formatlarni 'order' ga yoz. 
+   Hatto "123_12 dan zakaz" desa ham faqat "123_12" qismini ol.
 5. LOCATION (Joy): "Sexda", "Zamin barakada", "Skladda" -> 'location' ga yoz.
 
 MISOLLAR:
