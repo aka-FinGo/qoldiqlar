@@ -6,7 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.ai_core import analyze_message
-from services.gsheets import sync_new_user, sync_new_remnant, get_all_users_from_sheet, update_sheet_status, update_sheet_qty
+from services.gsheets import sync_new_user, sync_new_remnant, get_all_users_from_sheet, update_sheet_status, update_sheet_qty, get_all_remnants_from_sheet
 from config import ADMIN_ID, ADMIN_USERNAME
 
 router = Router()
