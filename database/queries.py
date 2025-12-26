@@ -1,3 +1,4 @@
+from datetime import datetime
 from database.connection import get_db_connection
 
 # --- 1. QOLDIQ QIDIRISH (MUKAMMAL QIDIRUV) ---
@@ -147,3 +148,37 @@ def sync_remnant_from_sheet(remnant_id, material, width, height, qty, location, 
         print(f"❌ Sheetdan sync qilishda xato: {e}")
     finally:
         conn.close()
+
+
+# --- 8. Qoldiqlarni qaytarib joyiga qo'yish (Undo) yoki kim ishlatganini bilish uchun bazaga status (1-bor, 0-ishlatilgan) va updated_at ---
+def use_remnant(remnant_id, user_id):
+    """Qoldiqni ishlatilgan (status=0) deb belgilash"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE remnants SET status = 0, used_by = %s, updated_at = %s WHERE id = %s",
+            (user_id, datetime.now(), remnant_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally: conn.close()
+
+def restore_remnant(remnant_id):
+    """Xatolik bo'lsa, ishlatilgan qoldiqni qaytarish (status=1)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE remnants SET status = 1 WHERE id = %s", (remnant_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally: conn.close()
+
+def get_remnant_details(remnant_id):
+    """ID bo'yicha to'liq ma'lumotni olish"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM remnants WHERE id = %s", (remnant_id,))
+        return cursor.fetchone()
+    finally: conn.close()
