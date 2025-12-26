@@ -135,19 +135,26 @@ async def show_item_details(message: types.Message, r_id: int):
         await message.answer("❌ Topilmadi.")
         return
 
+    # Sanani f-stringdan tashqarida tayyorlab olamiz (Xatolikni oldini olish uchun)
+    created_date = item['created_at'].strftime('%d.%m.%Y %H:%M')
+    order_val = item['origin_order'] if item['origin_order'] else "Yo'q"
+
     text = (f"📑 **To'liq ma'lumot (ID: #{item['id']})**\n\n"
             f"🛠 **Material:** {item['category']} {item['material']}\n"
             f"📏 **O'lcham:** {item['width']}x{item['height']} mm\n"
             f"📦 **Soni:** {item['qty']} ta\n"
-            f"🔢 **Buyurtma:** {item['origin_order'] or 'Yo\'q'}\n"
+            f"🔢 **Buyurtma:** {order_val}\n"
             f"📍 **Izoh/Joy:** {item['location']}\n"
             f"👤 **Qo'shdi:** {item['created_by_name']}\n"
-            f"📅 **Sana:** {item['created_at'].strftime('%d.%m.%Y %H:%M')}")
+            f"📅 **Sana:** {created_date}")
     
     kb = InlineKeyboardBuilder()
     if item['status'] == 1:
         kb.button(text="✅ Ishlatish (Olish)", callback_data=f"use:{item['id']}")
+    else:
+        kb.button(text="🔄 Qaytarib qo'yish", callback_data=f"restore:{item['id']}")
     kb.adjust(1)
+    
     await message.answer(text, reply_markup=kb.as_markup(), parse_mode="Markdown")
 
 @router.message(F.text)
