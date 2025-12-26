@@ -13,19 +13,38 @@ def get_sheet_client():
         return None
 
 def sync_new_remnant(data):
-    """Yangi qoldiqni Sheetga yozish (A-M ustunlar)"""
+    """Yangi qoldiqni Sheetga skrinshot va J-Q tartibiga moslab yozish"""
     client = get_sheet_client()
     if not client: return
     try:
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
         hozirgi_vaqt = datetime.now().strftime("%d.%m.%Y %H:%M")
+        
+        # Ustunlar tartibi (A-Q):
         row = [
-            f"#{data.get('id')}", hozirgi_vaqt, data.get('category'), data.get('material'),
-            data.get('width'), data.get('height'), data.get('qty'), data.get('origin_order'),
-            data.get('user_name'), str(data.get('user_id')), data.get('location'), 1, ""
-        ] + [""] * 4 # N, O, P, Q ustunlar bo'sh
+            f"#{data.get('id')}",           # A: ID
+            hozirgi_vaqt,                    # B: SANA
+            data.get('category'),           # C: Kategoriya
+            data.get('material'),           # D: Material
+            data.get('height'),             # E: Bo'yi
+            data.get('width'),              # F: Eni
+            data.get('qty'),                # G: Soni
+            data.get('order'),              # H: Buyurtma (Zakaz)
+            data.get('user_name'),          # I: Kim qo'shdi
+            str(data.get('user_id')),       # J: User ID
+            data.get('location'),           # K: Lokatsiya/Izoh
+            1,                              # L: Status (1-mavjud)
+            "",                             # M: Rasm ID (bo'sh)
+            "",                             # N: Kim oldi
+            "",                             # O: Olingan sana
+            "",                             # P: Qaysi zakazga
+            ""                              # Q: Sabab
+        ]
         sheet.append_row(row)
-    except Exception as e: print(f"❌ Sheetga yozishda xato: {e}")
+        print(f"✅ Sheetga qo'shildi: #{data.get('id')}")
+    except Exception as e: 
+        print(f"❌ Sheetga yozishda xato: {e}")
+
 
 def sync_new_user(user_id, full_name):
     """Yangi userni Ruxsatlar varag'iga yozish"""
@@ -56,32 +75,29 @@ def get_all_remnants_from_sheet():
 # services/gsheets.py fayliga qo'shing
 
 def update_sheet_qty(remnant_id, new_qty):
-    """Sheetdagi mavjud qoldiq sonini yangilaydi"""
+    """G ustunidagi (7-ustun) sonni yangilash"""
     client = get_sheet_client()
     if not client: return
     try:
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
-        # ID ustunidan (A) kerakli IDni qidiramiz
         cell = sheet.find(f"#{remnant_id}")
         if cell:
-            # G ustuni (7-ustun) Soni uchun mas'ul
-            sheet.update_cell(cell.row, 7, new_qty)
-            print(f"✅ Sheetda ID #{remnant_id} soni {new_qty} ga o'zgardi.")
+            sheet.update_cell(cell.row, 7, new_qty) # G ustuni (7-ustun)
     except Exception as e:
-        print(f"❌ Sheet qty update xatosi: {e}")
+        print(f"❌ Qty yangilashda xato: {e}")
 
 
 
 def update_sheet_status(remnant_id, status):
-    """Sheetdagi qoldiq holatini (L ustuni) o'zgartiradi (1-bor, 0-ishlatilgan)"""
+    """L ustunidagi (12-ustun) holatni yangilash"""
     client = get_sheet_client()
     if not client: return
     try:
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
         cell = sheet.find(f"#{remnant_id}")
         if cell:
-            # L ustuni (12-ustun) status uchun
+            # Status L ustunida (12-ustun)
             sheet.update_cell(cell.row, 12, status)
-            print(f"✅ Sheetda ID #{remnant_id} statusi {status} ga o'zgardi.")
+            print(f"✅ ID #{remnant_id} statusi {status} ga yangilandi.")
     except Exception as e:
-        print(f"❌ Sheet status update xatosi: {e}")
+        print(f"❌ Status yangilashda xato: {e}")
