@@ -52,3 +52,20 @@ def get_all_remnants_from_sheet():
     try:
         return client.open_by_key(SPREADSHEET_ID).get_worksheet(0).get_all_values()[1:]
     except: return []
+
+# services/gsheets.py fayliga qo'shing
+
+def update_sheet_qty(remnant_id, new_qty):
+    """Sheetdagi mavjud qoldiq sonini yangilaydi"""
+    client = get_sheet_client()
+    if not client: return
+    try:
+        sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
+        # ID ustunidan (A) kerakli IDni qidiramiz
+        cell = sheet.find(f"#{remnant_id}")
+        if cell:
+            # G ustuni (7-ustun) Soni uchun mas'ul
+            sheet.update_cell(cell.row, 7, new_qty)
+            print(f"✅ Sheetda ID #{remnant_id} soni {new_qty} ga o'zgardi.")
+    except Exception as e:
+        print(f"❌ Sheet qty update xatosi: {e}")
