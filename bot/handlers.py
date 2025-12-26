@@ -171,18 +171,32 @@ async def cmd_view_detail(message: types.Message):
 async def cmd_sync(message: types.Message):
     if str(message.from_user.id) != str(ADMIN_ID): return
     
-    status_msg = await message.answer("🔄 **Sinxronlash ketmoqda...**")
-    sheet_users = get_all_users_from_sheet()
+    status_msg = await message.answer("🔄 <b>Majburiy sinxronlash boshlandi...</b>", parse_mode="HTML")
     
-    count = 0
-    for row in sheet_users:
-        try:
-            u_id, p_val = row[0], str(row[2]).lower().strip()
-            status = 1 if p_val in ['1', 'true', 'ha', 'bor'] else 0
-            db.update_user_permission(u_id, status)
-            count += 1
-        except: continue
-    await status_msg.edit_text(f"✅ Bajarildi! {count} ta user ruxsati yangilandi.")
+    try:
+        # 1. Userlarni yangilash
+        users = get_all_users_from_sheet()
+        for row in users:
+            try:
+                db.update_user_permission(row[0], 1 if str(row[2]).lower() in ['1', 'true', 'ha'] else 0)
+            except: continue
+        
+        # 2. Qoldiqlarni Sheetdan bazaga qayta yozish
+        remnants = get_all_remnants_from_sheet()
+        for r in remnants:
+            try:
+                # r[0]-ID, r[3]-material, r[4]-width, r[5]-height, r[6]-qty, r[9]-order, r[10]-location, r[11]-status
+                db.sync_remnant_from_sheet(
+                    r[0], r[3], int(r[4]), int(r[5]), int(r[6]), 
+                    r[9], # BUYURTMA RAQAMI
+                    r[10], # LOKATSIYA
+                    int(r[11]) # STATUS
+                )
+            except: continue
+            
+        await status_msg.edit_text("✅ <b>Baza va GSheets to'liq sinxronlandi!</b>", parse_mode="HTML")
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Xato: {e}")
 
 # --- CALLBACK HANDLERS ---
 
