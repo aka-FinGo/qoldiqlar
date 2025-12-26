@@ -138,19 +138,20 @@ def update_user_permission(user_id, status):
         conn.close()
 
 # --- 7. SHEETDAN TAHRIRLANGANDA YANGILASH ---
-def sync_remnant_from_sheet(remnant_id, material, width, height, qty, location, status):
+def sync_remnant_from_sheet(r_id, material, width, height, qty, order_no, location, status):
     conn = get_db_connection()
-    if not conn: return
     cursor = conn.cursor()
     try:
-        # ID'dagi # belgisini olib tashlaymiz
-        clean_id = int(str(remnant_id).replace('#', ''))
+        # ID mavjud bo'lsa yangilaydi, bo'lmasa qo'shadi (UPSERT)
         query = """
-            UPDATE remnants 
-            SET material = %s, width = %s, height = %s, qty = %s, location = %s, status = %s
-            WHERE id = %s
+            INSERT INTO remnants (id, material, width, height, qty, origin_order, location, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET
+            material=EXCLUDED.material, width=EXCLUDED.width, height=EXCLUDED.height, 
+            qty=EXCLUDED.qty, origin_order=EXCLUDED.origin_order, 
+            location=EXCLUDED.location, status=EXCLUDED.status;
         """
-        cursor.execute(query, (material, width, height, qty, location, status, clean_id))
+        cursor.execute(query, (r_id.replace('#',''), material, width, height, qty, order_no, location, status))
         conn.commit()
     except Exception as e:
         print(f"❌ Sheetdan sync qilishda xato: {e}")
