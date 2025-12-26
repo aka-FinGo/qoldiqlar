@@ -14,7 +14,10 @@ from services.gsheets import get_all_users_from_sheet, get_all_remnants_from_she
 # Loglarni sozlash (Xatolarni ko'rish uchun)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+# Render portni muhit o'zgaruvchisidan oladi, topolmasa 10000 ishlatadi
+port = int(os.getenv("PORT", 10000))
+site = web.TCPSite(runner, '0.0.0.0', port)
+await site.start()
 # --- SINXRONIZATSIYA VAZIFASI ---
 async def full_sync_task():
     logger.info("🔄 Sinxronizatsiya boshlandi...")
