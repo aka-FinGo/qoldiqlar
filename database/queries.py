@@ -7,23 +7,26 @@ def search_remnants(query_text):
     if not conn: return []
     cursor = conn.cursor()
     try:
-        # Foydalanuvchi "ishlatilgan" deb so'rasa status=0, bo'lmasa status=1
-        status_filter = 0 if "ishlatilgan" in query_text.lower() else 1
+        # User "ishlatilgan" deb yozganini tekshirish
+        is_used_search = "ishlatilgan" in query_text.lower()
+        status_filter = 0 if is_used_search else 1
         
-        # Qidiruv so'rovidan "ishlatilgan" so'zini olib tashlaymiz
+        # Qidiruv so'zini tozalash
         clean_query = query_text.lower().replace("ishlatilgan", "").strip()
+        
+        # Agar so'z juda qisqa bo'lsa (masalan shunchaki "ishlatilgan"), hamma status 0 larni chiqaradi
+        search_param = f"%{clean_query}%"
         
         query = """
             SELECT * FROM remnants 
-            WHERE (material ILIKE %s OR category ILIKE %s) 
+            WHERE (material ILIKE %s OR category ILIKE %s OR CAST(id AS TEXT) ILIKE %s) 
             AND status = %s
             ORDER BY id DESC
         """
-        cursor.execute(query, (f"%{clean_query}%", f"%{clean_query}%", status_filter))
+        cursor.execute(query, (search_param, search_param, search_param, status_filter))
         return cursor.fetchall()
     except Exception as e:
-        # Mana shu joyi xatolikni logda ko'rish uchun kerak
-        print(f"❌ Qidiruv xatosi: {e}")
+        print(f"❌ Qidiruv xatosi (SQL): {e}") # Render logda buni ko'rasiz
         return []
     finally:
         conn.close()
