@@ -2,6 +2,8 @@ from aiohttp import web
 import json
 import database.queries as db
 from config import ADMIN_ID
+# Sheetga yozish uchun funksiyani chaqiramiz
+from services.gsheets import sync_new_remnant 
 
 # --- 1. GET (Olish) ---
 async def get_remnants(request):
@@ -14,20 +16,25 @@ async def get_remnants(request):
         conn = db.get_db_connection()
         cursor = conn.cursor()
         
-        # Asosiy Query
-        sql = "SELECT * FROM remnants WHERE 1=1"
+        # SQL ni shunday yozamizki, Frontend tushunadigan 'user_id' qaytsin
+        # created_by_user_id AS user_id degani - nomini o'zgartirib ber degani
+        sql = """
+            SELECT id, category, material, width, height, qty, origin_order, location, status, 
+                   created_by_user_id AS user_id 
+            FROM remnants WHERE 1=1
+        """
         args = []
 
         if filter_type == 'mine':
-            # Profil: O'zim qo'shganlar (created_by_user_id bo'yicha)
+            # Profil: O'zim qo'shganlar
             sql += " AND created_by_user_id = %s"
             args.append(user_id)
         elif filter_type == 'used':
-            # Profil: Men ishlatganlarim (used_by_user_id bo'yicha)
+            # Profil: Men ishlatganlarim
             sql += " AND status = 0 AND used_by_user_id = %s"
             args.append(user_id)
         else: # 'all'
-            # Bosh sahifa: Faqat omborda borlar
+            # Bosh sahifa
             sql += " AND status = 1"
 
         if category and category != 'all':
@@ -49,6 +56,7 @@ async def get_categories(request):
     try:
         conn = db.get_db_connection()
         cur = conn.cursor()
+        # Faqat aktiv qoldiqlarning kategoriyalarini olamiz
         cur.execute("SELECT DISTINCT category FROM remnants WHERE status=1 ORDER BY category")
         cats = [row[0] for row in cur.fetchall()]
         conn.close()
@@ -72,7 +80,7 @@ async def use_remnant(request):
         conn = db.get_db_connection()
         cur = conn.cursor()
         
-        # O'ZGARISH: used_by_user_id ustuniga yozamiz
+        # Ishlatilganda used_by_user_id ga yozamiz
         cur.execute("""
             UPDATE remnants 
             SET status=0, used_by_user_id=%s, used_at=NOW() 
@@ -91,13 +99,14 @@ async def add_remnant(request):
         conn = db.get_db_connection()
         cur = conn.cursor()
         
-        # O'ZGARISH: created_by_user_id ustuniga yozamiz
+        # 1. Bazaga yozish va ID ni qaytarib olish (RETURNING id)
         cur.execute("""
             INSERT INTO remnants (
                 category, material, width, height, qty, 
                 origin_order, location, created_by_user_id, status, created_at
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, NOW())
+            RETURNING id
         """, (
             data['category'], 
             data['material'], 
@@ -106,11 +115,35 @@ async def add_remnant(request):
             int(data['qty']), 
             data.get('order', ''), 
             data.get('location', ''), 
-            data['user_id'] # Bu created_by_user_id ga tushadi
+            data['user_id']
         ))
+        
+        new_id = cur.fetchone()[0] # Yangi ID ni oldik
         conn.commit()
         conn.close()
-        return web.json_response({'status': 'ok'})
+
+        # 2. Google Sheetsga ham yozamiz (Sinxronizatsiya)
+        # sync_new_remnant funksiyasi dict kutadi
+        sheet_data = {
+            'id': new_id,
+            'category': data['category'],
+            'material': data['material'],
+            'width': int(data['width']),
+            'height': int(data['height']),
+            'qty': int(data['qty']),
+            'order': data.get('order', ''),
+            'location': data.get('location', ''),
+            'user_id': data['user_id'],
+            'user_name': 'MiniApp User' # Ismni keyinchalik to'g'irlash mumkin
+        }
+        
+        try:
+            sync_new_remnant(sheet_data)
+        except Exception as sheet_err:
+            print(f"Sheet Sync Error: {sheet_err}")
+            # Sheetga yozilmasa ham, dastur to'xtab qolmasin
+
+        return web.json_response({'status': 'ok', 'new_id': new_id})
     except Exception as e:
         print(f"ADD ERROR: {e}")
         return web.json_response({'error': str(e)}, status=500)
@@ -121,6 +154,7 @@ async def edit_remnant(request):
         conn = db.get_db_connection()
         cur = conn.cursor()
         
+        # Tahrirlash
         cur.execute("""
             UPDATE remnants 
             SET category=%s, material=%s, width=%s, height=%s, qty=%s, 
