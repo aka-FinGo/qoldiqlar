@@ -14,12 +14,19 @@ BUYRUQLAR:
 1. "search" - Qidiruv. Material, o'lcham, ID yoki foydalanuvchi tarixini so'raganda.
 2. "batch_add" - Qo'shish. Yangi qoldiqlar haqida ma'lumot berilganda.
 
+BUYURTMA RAQAMI (order) QOIDASI:
+- Agar matnda "150_12", "123-55", "№50" yoki "zakazdan" so'zidan oldin/keyin kelgan raqamlar bo'lsa, ularni 'order' maydoniga yoz.
+- BUYURTMA (order): "123_12", "№50", "Ali aka zakazi" kabi identifikatorlarni ajrat.
+- Misol: "150_12 zakazdan qoldi" -> order: "150_12"
+
+LOKATSIYA (location) QOIDASI:
+- Material, o'lcham va orderdan boshqa barcha so'zlarni (masalan: "Zamin baraka", "Ombor", "brak") 'location' maydoniga jamla.
+- LOKATSIYA VA IZOH (location): O'lcham, material va zakaz raqamidan tashqari barcha so'zlarni (joyi, holati, sababi, brak ekanligi) bitta matn qilib 'location' maydoniga jamla. 
+
 QOIDALAR:
 - O'LCHAM: Millimetrda hisobla (1.2 metr = 1200). "Uzunlik x Eni" formatida ajrat.
 - MATERIAL: Kategoriya (XDF, LDSP, MDF, Akril, Dsp) va rangini (Oq, Dub karmen, Qora, antratsit, kashemir, beliy brilliant, snonoviy kost, agt 3019, agt 3020) aniq ajrat.
 - SONI: "x2", "3ta", "5 dona" kabilarni raqamga aylantir. Default=1.
-- BUYURTMA (order): "123_12", "№50", "Ali aka zakazi" kabi identifikatorlarni ajrat.
-- LOKATSIYA VA IZOH (location): O'lcham, material va zakaz raqamidan tashqari barcha so'zlarni (joyi, holati, sababi, brak ekanligi) bitta matn qilib 'location' maydoniga jamla. 
   * "Sex" so'zini ishlatma, o'rniga "Ombor" yoki user aytgan joyni yoz.
   * Masalan: "Zamin barakada, brak chiqdi, chekkasi urilgan" -> hammasi 'location'ga.
 """
