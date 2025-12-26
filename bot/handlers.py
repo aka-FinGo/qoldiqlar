@@ -181,16 +181,41 @@ async def cmd_my_used(message: types.Message):
     text += format_search_results(items[:10], len(items), 0)
     await message.answer(text, parse_mode="HTML")
 
+# --- QAYTARIB QO'YISH CALLBACK ---
+@router.callback_query(F.data.startswith("restore:"))
+async def process_restore(callback: types.CallbackQuery):
+    try:
+        r_id = int(callback.data.split(":")[1])
+        # Bazada statusni 1 qilamiz va used_by ni tozalaymiz
+        success = db.restore_remnant(r_id)
+        
+        if success:
+            # GSheets'da statusni 1 qilamiz
+            from services.gsheets import update_sheet_status
+            update_sheet_status(r_id, 1)
+            
+            await callback.message.edit_text(f"🔄 ID #{r_id} omborga qaytarildi va mavjud deb belgilandi.")
+        else:
+            await callback.answer("❌ Xato: Qoldiqni qaytarib bo'lmadi.", show_alert=True)
+    except Exception as e:
+        print(f"❌ Restore error: {e}")
+        await callback.answer("❌ Tizim xatosi")
+    await callback.answer()
+
+# --- /list BUYRUG'I (5 tadan chiqarish) ---
 @router.message(Command("list"))
 async def cmd_list_all(message: types.Message):
     items = db.get_all_active_remnants()
     if not items:
         return await message.answer("📭 Omborda qoldiq mavjud emas.")
     
-    text = f"📋 <b>Mavjud qoldiqlar ro'yxati</b> (Jami: {len(items)} ta):\n\n"
-    # Ro'yxat juda uzun bo'lsa, birinchi 20 tasini ko'rsatamiz
-    text += format_search_results(items[:20], len(items), 0)
-    await message.answer(text, parse_mode="HTML")
+    # Faqat birinchi 5 tasini ko'rsatamiz
+    text = f"📋 <b>Mavjud qoldiqlar</b> (Jami: {len(items)} ta):\n\n"
+    text += format_search_results(items[:5], len(items), 0)
+    
+    # Tugmalarni chiqarish (Pagination)
+    kb = get_search_keyboard("ALL_LIST", 0, len(items))
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
     
 
 # --- QAYTARIB QO'YISH TUGMASI LOGIKASI ---
