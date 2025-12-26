@@ -11,9 +11,11 @@ from bot.handlers import router as main_router
 import database.queries as db
 from services.gsheets import get_all_users_from_sheet, get_all_remnants_from_sheet
 
-# --- YANGI: API va WebApp funksiyalarini import qilamiz ---
-# (Bu ishlashi uchun services/api.py fayli bo'lishi kerak)
-from services.api import get_remnants, use_remnant, add_remnant, get_categories
+# --- API va WebApp funksiyalarini import qilamiz ---
+from services.api import (
+    get_remnants, use_remnant, add_remnant, get_categories, 
+    edit_remnant, delete_remnant, check_is_admin
+)
 
 # Loglarni sozlash
 logging.basicConfig(level=logging.INFO)
@@ -52,11 +54,12 @@ async def full_sync_task():
 async def web_app_handler(request):
     """Mini Appning asosiy HTML faylini o'qib beradi"""
     try:
+        # templates papkasidagi index.html ni o'qiymiz
         with open('templates/index.html', 'r', encoding='utf-8') as f:
             content = f.read()
         return web.Response(text=content, content_type='text/html')
     except FileNotFoundError:
-        return web.Response(text="Xatolik: templates/index.html fayli topilmadi! Iltimos uni yarating.", status=404)
+        return web.Response(text="Xatolik: templates/index.html fayli topilmadi!", status=404)
 
 async def handle_health_check(request):
     """Render bot o'chib qolmasligi uchun ping qiladigan manzil"""
@@ -66,20 +69,26 @@ async def start_web_server():
     app = web.Application()
     
     # --- MARSHRUTLAR (ROUTES) ---
-    # 1. Web Appning asosiy ko'rinishi
+    
+    # 1. Static fayllar (CSS, JS) uchun yo'l ochamiz (MUHIM!)
+    # Bu qator bo'lmasa style.css va script.js ishlamaydi
+    app.router.add_static('/static/', path='static', name='static')
+
+    # 2. Web Appning asosiy ko'rinishi
     app.router.add_get('/webapp', web_app_handler)
     
-    # 2. Frontend uchun APIlar (Ma'lumot olish/yuborish)
+    # 3. Frontend uchun APIlar
     app.router.add_get('/api/remnants', get_remnants)
     app.router.add_get('/api/categories', get_categories)
     app.router.add_post('/api/use', use_remnant)
     app.router.add_post('/api/add', add_remnant)
+    
+    # Admin APIlar
     app.router.add_post('/api/edit', edit_remnant)
-app.router.add_post('/api/delete', delete_remnant)
-app.router.add_get('/api/check_admin', check_is_admin)
-app.router.add_static('/static/', path='static', name='static')
-
-    # 3. Oddiy Health Check (Bot ishlayaptimi yo'qmi bilish uchun)
+    app.router.add_post('/api/delete', delete_remnant)
+    app.router.add_get('/api/check_admin', check_is_admin)
+    
+    # 4. Oddiy Health Check
     app.router.add_get('/', handle_health_check)
 
     runner = web.AppRunner(app)
@@ -101,7 +110,7 @@ async def main():
     # Web serverni (API va App bilan birga) ishga tushiramiz
     await start_web_server()
 
-    # Avtomatik sinxronizatsiya (Har 60 daqiqada - optimal vaqt)
+    # Avtomatik sinxronizatsiya (Har 60 daqiqada)
     scheduler = AsyncIOScheduler()
     scheduler.add_job(full_sync_task, "interval", minutes=60)
     scheduler.start()
