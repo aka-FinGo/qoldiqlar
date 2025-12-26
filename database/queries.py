@@ -230,7 +230,7 @@ def get_remnant_details(remnant_id):
         return cursor.fetchone()
     finally: conn.close()
 
-def smart_search(query_text, min_w=0, min_h=0, is_flexible=False):
+def smart_search(query, min_w=0, min_h=0, is_flexible=False):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
