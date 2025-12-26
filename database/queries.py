@@ -258,28 +258,29 @@ def advanced_search_db(keywords, min_w=0, min_h=0):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Asosiy so'rov
+        # Faqat aktiv (status=1) qoldiqlarni qidiramiz
         sql = "SELECT * FROM remnants WHERE status = 1"
         params = []
 
-        # 1. Kalit so'zlar bo'yicha (Material yoki Kategoriya ustunidan)
+        # 1. Agar kalit so'zlar bo'lsa (va ular bo'sh bo'lmasa)
         if keywords:
-            # Har bir so'z qatnashishi shart (AND mantiqi)
             conditions = []
             for word in keywords:
+                # Har bir so'z material, kategoriya yoki lokatsiyada bo'lishi kerak
                 conditions.append("(material ILIKE %s OR category ILIKE %s OR location ILIKE %s)")
                 params.extend([f"%{word}%", f"%{word}%", f"%{word}%"])
             sql += " AND (" + " AND ".join(conditions) + ")"
 
-        # 2. O'lcham bo'yicha (Aylantirib ham ko'rish: W>=req_W yoki W>=req_H)
+        # 2. O'lcham bo'yicha (Aylantirib ham ko'rish: WxH yoki HxW)
         if min_w > 0 and min_h > 0:
             sql += """ AND (
                 (width >= %s AND height >= %s) OR 
                 (width >= %s AND height >= %s)
             )"""
-            # Ikki holat: To'g'ri qo'yish yoki aylantirib qo'yish
+            # Ikki kombinatsiya: Asl holat va Aylantirilgan holat
             params.extend([min_w, min_h, min_h, min_w])
 
         cursor.execute(sql, params)
         return cursor.fetchall()
-    finally: conn.close()
+    finally:
+        conn.close()
