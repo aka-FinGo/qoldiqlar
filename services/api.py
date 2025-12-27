@@ -128,7 +128,11 @@ async def add_remnant(request):
         new_id = cur.fetchone()[0]
         conn.commit()
         conn.close()
-        try: sync_new_remnant({'id': new_id, **data})
+        try:
+    data['id'] = new_id  # <--- MANA SHU QATOR ID CHIQISHINI TA'MINLAYDI
+    sync_new_remnant(data)
+except Exception as e:
+    logger.error(f"GSheets error: {e}")
         except: pass
         return web.json_response({'status': 'ok'})
     except Exception as e:
