@@ -1,35 +1,33 @@
 from datetime import datetime
 from database.connection import get_db_connection
 
-# --- 1. QOLDIQ QIDIRISH (MUKAMMAL QIDIRUV) ---
 def search_remnants(query_text):
     conn = get_db_connection()
     if not conn: return []
     cursor = conn.cursor()
     try:
-        # User "ishlatilgan" deb yozganini tekshirish
         is_used_search = "ishlatilgan" in query_text.lower()
         status_filter = 0 if is_used_search else 1
-        
-        # Qidiruv so'zini tozalash
         clean_query = query_text.lower().replace("ishlatilgan", "").strip()
-        
-        # Agar so'z juda qisqa bo'lsa (masalan shunchaki "ishlatilgan"), hamma status 0 larni chiqaradi
         search_param = f"%{clean_query}%"
         
+        # SQL so'rovida ustunlarni aniq ko'rsatamiz
         query = """
-            SELECT * FROM remnants 
+            SELECT id, category, material, width, height, qty, origin_order, location, status, created_by_user_id 
+            FROM remnants 
             WHERE (material ILIKE %s OR category ILIKE %s OR CAST(id AS TEXT) ILIKE %s) 
             AND status = %s
             ORDER BY id DESC
         """
         cursor.execute(query, (search_param, search_param, search_param, status_filter))
-        return cursor.fetchall()
+        return cursor.fetchall() # Bu tuple qaytaradi
     except Exception as e:
-        print(f"❌ Qidiruv xatosi (SQL): {e}") # Render logda buni ko'rasiz
+        print(f"❌ Qidiruv xatosi: {e}")
         return []
     finally:
         conn.close()
+
+# Boshqa funksiyalarda ham status va ustunlar tartibini tekshirib oling
 
 
 def get_used_remnants(user_id=None):
