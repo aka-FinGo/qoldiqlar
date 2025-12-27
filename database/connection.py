@@ -1,12 +1,20 @@
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from config import DB_URL
 
 def get_db_connection():
-    """Neon.tech bazasiga ulanish hosil qiladi"""
+    # Render'dagi Environment Variable'dan o'qiydi
+    # Agar topilmasa, xato bermasligi uchun None qaytaradi
+    db_url = os.getenv("DATABASE_URL")
+    
+    if not db_url:
+        print("❌ Xatolik: DATABASE_URL environment o'zgaruvchisi topilmadi!")
+        return None
+
     try:
-        conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+        # Neon DB va boshqa Postgres bazalar uchun ulanish
+        conn = psycopg2.connect(db_url)
         return conn
     except Exception as e:
-        print(f"❌ Bazaga ulanishda xatolik: {e}")
+        print(f"❌ Baza bilan ulanishda xato: {e}")
         return None
