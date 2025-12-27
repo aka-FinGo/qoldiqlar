@@ -162,26 +162,20 @@ def update_user_permission(user_id, status):
 
 # --- 7. SHEETDAN TAHRIRLANGANDA YANGILASH ---
 def sync_remnant_from_sheet(row):
-    """
-    Google Sheets'dan kelgan 17 ta ustunni (A-Q) bazaga UPSERT qiladi.
-    row: GSheets'dan kelgan bitta qator (ro'yxat ko'rinishida)
-    """
     conn = get_db_connection()
     if not conn: return
     cursor = conn.cursor()
     try:
-        # Ma'lumotlarni tozalash va formatlash (17 ta ustun)
-        # Agar qator yetarli bo'lmasa None bilan to'ldiramiz
-        r = [str(x).strip() if x != "" else None for x in row]
+        # 1. Ma'lumotlarni tozalash (A dan Q gacha jami 17 ta)
+        r = [str(x).strip() if (x is not None and x != "") else None for x in row]
         while len(r) < 17: r.append(None)
 
-        # ID ni tozalash (# belgisini olib tashlash)
-        raw_id = str(r[0]).replace('#', '') if r[0] else None
-        if not raw_id or not raw_id.isdigit(): return
-        
-        r_id = int(raw_id)
-        
-        # SQL: Hamma ustunlarni yangilaydigan UPSERT
+        # 2. ID ni tekshirish
+        raw_id = r[0].replace('#', '') if r[0] else None
+        if not raw_id or not raw_id.isdigit():
+            return # Sarlavha bo'lsa o'tib ketadi
+
+        # 3. SQL UPSERT (Hamma 17 ta ustun bilan)
         query = """
             INSERT INTO remnants (
                 id, category, material, width, height, qty, origin_order, location, 
@@ -210,21 +204,22 @@ def sync_remnant_from_sheet(row):
                 updated_at = NOW();
         """
         
-        # Parametrlarni tartib bilan joylashtirish
+        # Sonlarni xavfsiz o'tkazish
+        def to_int(val, default=0):
+            try: return int(float(str(val).replace(',', '.')))
+            except: return default
+
         params = (
-            r_id, r[1], r[2], 
-            int(r[3]) if r[3] and str(r[3]).isdigit() else 0,
-            int(r[4]) if r[4] and str(r[4]).isdigit() else 0,
-            int(r[5]) if r[5] and str(r[5]).isdigit() else 0,
-            r[6], r[7], 
-            int(r[8]) if r[8] and str(r[8]).isdigit() else 1,
+            int(raw_id), r[1], r[2], 
+            to_int(r[3]), to_int(r[4]), to_int(r[5]), 
+            r[6], r[7], to_int(r[8], 1),
             r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16]
         )
 
         cursor.execute(query, params)
         conn.commit()
     except Exception as e:
-        print(f"❌ Row Sync Error (ID: {row[0]}): {e}")
+        print(f"⚠️ Row Sync Error (ID: {row[0]}): {e}")
     finally:
         conn.close()
 
