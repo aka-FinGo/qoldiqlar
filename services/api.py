@@ -13,13 +13,12 @@ async def get_remnants(request):
         category = params.get('category')
         
         conn = db.get_db_connection()
+        # Kursorni DictCursor yoki oddiy kursor sifatida ishlatishimizga qarab:
         cursor = conn.cursor()
         
-        # SQL: Ustun nomlarini 'AS' orqali Frontendga moslaymiz
         sql = """
             SELECT id, category, material, width, height, qty, 
-                   origin_order, location, status, 
-                   created_by_user_id AS user_id 
+                   origin_order, location, status, created_by_user_id 
             FROM remnants WHERE 1=1
         """
         args = []
@@ -30,7 +29,7 @@ async def get_remnants(request):
         elif filter_type == 'used':
             sql += " AND status = 0 AND used_by_user_id = %s"
             args.append(user_id)
-        else:
+        else: # 'all'
             sql += " AND status = 1"
 
         if category and category != 'all':
@@ -40,13 +39,26 @@ async def get_remnants(request):
         sql += " ORDER BY id DESC"
         
         cursor.execute(sql, args)
-        columns = [desc[0] for desc in cursor.description]
-        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        conn.close()
         
+        # --- MUHIM QISM: Lug'atni to'g'ri shakllantirish ---
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            # row - bu (36, 'LDSP', 'Oq', ...) shaklidagi tuple
+            # Biz uni columns bilan birlashtirib lug'at qilamiz
+            item = dict(zip(columns, row))
+            # Frontend user_id deb kutayotgani uchun:
+            item['user_id'] = item.get('created_by_user_id')
+            results.append(item)
+            
+        conn.close()
         return web.json_response(results)
+        
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
+
 
 async def get_categories(request):
     try:
