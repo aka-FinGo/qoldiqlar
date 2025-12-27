@@ -1,11 +1,12 @@
 import re
 from datetime import datetime
 from database.connection import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 def advanced_bot_search(query_text):
     conn = get_db_connection()
     if not conn: return []
-    cursor = conn.cursor() # DictCursor ishlatmasangiz, natija tuple bo'ladi
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # 1. Tozalash va statusni aniqlash
         query_text = query_text.lower().strip()
@@ -54,7 +55,7 @@ def advanced_bot_search(query_text):
 def search_remnants(query_text):
     conn = get_db_connection()
     if not conn: return []
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         is_used_search = "ishlatilgan" in query_text.lower()
         status_filter = 0 if is_used_search else 1
@@ -83,7 +84,7 @@ def search_remnants(query_text):
 def get_used_remnants(user_id=None):
     """Ishlatilgan qoldiqlarni olish (Agar user_id berilsa, faqat o'zinikini)"""
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if user_id:
             query = "SELECT * FROM remnants WHERE status = 0 AND used_by = %s ORDER BY updated_at DESC"
@@ -97,7 +98,7 @@ def get_used_remnants(user_id=None):
 def get_all_active_remnants():
     """Barcha mavjud (status=1) qoldiqlarni ro'yxat shaklida olish"""
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute("SELECT * FROM remnants WHERE status = 1 ORDER BY id DESC")
         return cursor.fetchall()
@@ -109,7 +110,7 @@ def check_duplicate(material, width, height, location):
     """Aynan bir xil o'lcham va materialdagi qoldiqni topish"""
     conn = get_db_connection()
     if not conn: return None
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         query = """
             SELECT id, qty FROM remnants 
@@ -129,11 +130,14 @@ def check_duplicate(material, width, height, location):
 def update_qty(remnant_id, add_qty):
     conn = get_db_connection()
     if not conn: return None
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # Avval eski sonini olamiz
         cursor.execute("SELECT qty FROM remnants WHERE id = %s", (remnant_id,))
-        old_qty = cursor.fetchone()['qty']
+        result = cursor.fetchone()
+        if not result:
+            return None
+        old_qty = result['qty']
         new_qty = old_qty + add_qty
         
         # Keyin yangilaymiz
@@ -148,7 +152,7 @@ def add_remnant_final(item, user_id, user_name):
     """Mutlaqo yangi qator qo'shish"""
     conn = get_db_connection()
     if not conn: return None
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         query = """
             INSERT INTO remnants (
@@ -167,7 +171,10 @@ def add_remnant_final(item, user_id, user_name):
             user_id,
             user_name
         ))
-        new_id = cursor.fetchone()['id']
+        result = cursor.fetchone()
+        if not result:
+            return None
+        new_id = result['id']
         conn.commit()
         return new_id
     except Exception as e:
@@ -180,7 +187,7 @@ def add_remnant_final(item, user_id, user_name):
 def get_or_create_user(user_id, full_name, username):
     conn = get_db_connection()
     if not conn: return None
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute("SELECT * FROM users WHERE user_id = %s", (str(user_id),))
         user = cursor.fetchone()
@@ -191,7 +198,10 @@ def get_or_create_user(user_id, full_name, username):
                 (str(user_id), full_name, username)
             )
             conn.commit()
-            return {"user_id": user_id, "can_search": 0, "can_add": 0, "is_new": True}
+            # Yangi yaratilgan userni qayta o'qib olamiz (RealDictCursor formatida)
+            cursor.execute("SELECT * FROM users WHERE user_id = %s", (str(user_id),))
+            user = cursor.fetchone()
+            return user
         return user
     finally:
         conn.close()
@@ -200,7 +210,7 @@ def get_or_create_user(user_id, full_name, username):
 def update_user_permission(user_id, status):
     conn = get_db_connection()
     if not conn: return
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # Agar user bazada bo'lsa yangilaydi, bo'lmasa qo'shadi
         query = """
@@ -225,7 +235,7 @@ def update_user_permission(user_id, status):
 def sync_remnant_from_sheet(row):
     conn = get_db_connection()
     if not conn: return
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # 1. Ma'lumotlarni tozalash va listga o'tkazish
         r = [str(x).strip() if (x is not None and x != "") else None for x in row]
@@ -342,7 +352,7 @@ def restore_remnant(remnant_id):
 def get_remnant_details(remnant_id):
     """ID bo'yicha to'liq ma'lumotni olish"""
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute("SELECT * FROM remnants WHERE id = %s", (remnant_id,))
         return cursor.fetchone()
@@ -350,7 +360,7 @@ def get_remnant_details(remnant_id):
 
 def smart_search(query, min_w=0, min_h=0, is_flexible=False):
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # Asosiy so'rov: material nomi va status bo'yicha
         sql = "SELECT * FROM remnants WHERE (material ILIKE %s OR category ILIKE %s) AND status = 1"
@@ -376,7 +386,7 @@ def smart_search(query, min_w=0, min_h=0, is_flexible=False):
 
 def advanced_search_db(keywords, min_w=0, min_h=0):
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # Faqat mavjud (status=1) qoldiqlarni olamiz
         sql = "SELECT * FROM remnants WHERE status = 1"
