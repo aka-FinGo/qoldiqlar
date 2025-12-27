@@ -22,7 +22,7 @@ async def get_remnants(request):
         category = params.get('category')
         
         conn = db.get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         # SQL: Ustunlar tartibi remnants.json dagi bilan bir xil bo'lishi shart
         sql = """
