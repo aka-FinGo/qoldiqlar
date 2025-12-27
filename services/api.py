@@ -4,10 +4,9 @@ from config import ADMIN_ID
 from services.gsheets import sync_new_remnant 
 import logging
 
-# Loglarni Render konsolida ko'rish uchun
 logger = logging.getLogger(__name__)
 
-# --- 1. Qoldiqlarni olish ---
+# --- 1. Qoldiqlarni olish (Indeksli mapping - Xato bermaydi) ---
 async def get_remnants(request):
     conn = None
     try:
@@ -19,6 +18,7 @@ async def get_remnants(request):
         conn = db.get_db_connection()
         cursor = conn.cursor()
         
+        # SQL: Aniq ustunlar tartibi
         sql = """
             SELECT id, category, material, width, height, qty, 
                    origin_order, location, status, created_by_user_id 
@@ -45,6 +45,7 @@ async def get_remnants(request):
         
         results = []
         for r in rows:
+            # r[0]=id, r[1]=category, r[2]=material, r[3]=width, r[4]=height, r[5]=qty...
             results.append({
                 "id": r[0],
                 "category": str(r[1] if r[1] else ""),
@@ -65,7 +66,7 @@ async def get_remnants(request):
     finally:
         if conn: conn.close()
 
-# --- 2. Kategoriyalarni olish ---
+# --- 2. Kategoriyalar ---
 async def get_categories(request):
     conn = None
     try:
@@ -79,22 +80,21 @@ async def get_categories(request):
     finally:
         if conn: conn.close()
 
-# --- 3. Ishlatish (Checkout) ---
+# --- 3. Ishlatish (Nomi main.py dagi importga mos) ---
 async def use_remnant(request):
     try:
         data = await request.json()
         conn = db.get_db_connection()
         cur = conn.cursor()
-        cur.execute("""
-            UPDATE remnants SET status=0, used_by_user_id=%s, used_at=NOW() WHERE id=%s
-        """, (data['user_id'], data['id']))
+        cur.execute("UPDATE remnants SET status=0, used_by_user_id=%s, used_at=NOW() WHERE id=%s", 
+                   (data['user_id'], data['id']))
         conn.commit()
         conn.close()
         return web.json_response({'status': 'ok'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
-# --- 4. Yangi qo'shish ---
+# --- 4. Qo'shish ---
 async def add_remnant(request):
     try:
         data = await request.json()
@@ -108,8 +108,7 @@ async def add_remnant(request):
         new_id = cur.fetchone()[0]
         conn.commit()
         conn.close()
-        try:
-            sync_new_remnant({'id': new_id, **data})
+        try: sync_new_remnant({'id': new_id, **data})
         except: pass
         return web.json_response({'status': 'ok'})
     except Exception as e:
@@ -145,8 +144,7 @@ async def delete_remnant(request):
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
-# --- 7. Adminlikni tekshirish ---
+# --- 7. Admin tekshiruvi ---
 async def check_is_admin(request):
     user_id = request.rel_url.query.get('user_id')
-    is_admin = str(user_id) == str(ADMIN_ID)
-    return web.json_response({'is_admin': is_admin})
+    return web.json_response({'is_admin': str(user_id) == str(ADMIN_ID)})
