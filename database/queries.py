@@ -161,26 +161,72 @@ def update_user_permission(user_id, status):
         conn.close()
 
 # --- 7. SHEETDAN TAHRIRLANGANDA YANGILASH ---
-def sync_remnant_from_sheet(r_id, material, width, height, qty, order_no, location, status):
+def sync_remnant_from_sheet(row):
+    """
+    Google Sheets'dan kelgan 17 ta ustunni (A-Q) bazaga UPSERT qiladi.
+    row: GSheets'dan kelgan bitta qator (ro'yxat ko'rinishida)
+    """
     conn = get_db_connection()
+    if not conn: return
     cursor = conn.cursor()
     try:
-        # ID mavjud bo'lsa yangilaydi, bo'lmasa qo'shadi (UPSERT)
+        # Ma'lumotlarni tozalash va formatlash (17 ta ustun)
+        # Agar qator yetarli bo'lmasa None bilan to'ldiramiz
+        r = [str(x).strip() if x != "" else None for x in row]
+        while len(r) < 17: r.append(None)
+
+        # ID ni tozalash (# belgisini olib tashlash)
+        raw_id = str(r[0]).replace('#', '') if r[0] else None
+        if not raw_id or not raw_id.isdigit(): return
+        
+        r_id = int(raw_id)
+        
+        # SQL: Hamma ustunlarni yangilaydigan UPSERT
         query = """
-            INSERT INTO remnants (id, material, width, height, qty, origin_order, location, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO remnants (
+                id, category, material, width, height, qty, origin_order, location, 
+                status, image_id, created_by_user_id, created_by_name, created_at, 
+                used_by_user_id, used_by_name, used_for_order, used_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
             ON CONFLICT (id) DO UPDATE SET
-            material=EXCLUDED.material, width=EXCLUDED.width, height=EXCLUDED.height, 
-            qty=EXCLUDED.qty, origin_order=EXCLUDED.origin_order, 
-            location=EXCLUDED.location, status=EXCLUDED.status;
+                category = EXCLUDED.category,
+                material = EXCLUDED.material,
+                width = EXCLUDED.width,
+                height = EXCLUDED.height,
+                qty = EXCLUDED.qty,
+                origin_order = EXCLUDED.origin_order,
+                location = EXCLUDED.location,
+                status = EXCLUDED.status,
+                image_id = EXCLUDED.image_id,
+                created_by_user_id = EXCLUDED.created_by_user_id,
+                created_by_name = EXCLUDED.created_by_name,
+                created_at = EXCLUDED.created_at,
+                used_by_user_id = EXCLUDED.used_by_user_id,
+                used_by_name = EXCLUDED.used_by_name,
+                used_for_order = EXCLUDED.used_for_order,
+                used_at = EXCLUDED.used_at,
+                updated_at = NOW();
         """
-        cursor.execute(query, (r_id.replace('#',''), material, width, height, qty, order_no, location, status))
+        
+        # Parametrlarni tartib bilan joylashtirish
+        params = (
+            r_id, r[1], r[2], 
+            int(r[3]) if r[3] and str(r[3]).isdigit() else 0,
+            int(r[4]) if r[4] and str(r[4]).isdigit() else 0,
+            int(r[5]) if r[5] and str(r[5]).isdigit() else 0,
+            r[6], r[7], 
+            int(r[8]) if r[8] and str(r[8]).isdigit() else 1,
+            r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16]
+        )
+
+        cursor.execute(query, params)
         conn.commit()
     except Exception as e:
-        print(f"❌ Sheetdan sync qilishda xato: {e}")
+        print(f"❌ Row Sync Error (ID: {row[0]}): {e}")
     finally:
         conn.close()
-
 
 # --- 8. Qoldiqlarni qaytarib joyiga qo'yish (Undo) yoki kim ishlatganini bilish uchun bazaga status (1-bor, 0-ishlatilgan) va updated_at ---
 def use_remnant(remnant_id, user_id):
