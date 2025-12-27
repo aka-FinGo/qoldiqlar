@@ -1,4 +1,6 @@
 from aiohttp import web
+import psycopg2
+from psycopg2.extras import RealDictCursor  # <--- MANA SHU QATORNI QO'SHING
 import database.queries as db
 from config import ADMIN_ID
 from services.gsheets import sync_new_remnant 
@@ -22,14 +24,10 @@ async def get_remnants(request):
         category = params.get('category')
         
         conn = db.get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # Kursor ochishda RealDictCursor ishlatamiz
+        cursor = conn.cursor(cursor_factory=RealDictCursor) 
         
-        # SQL: Ustunlar tartibi remnants.json dagi bilan bir xil bo'lishi shart
-        sql = """
-            SELECT id, category, material, width, height, qty, 
-                   origin_order, location, status, created_by_user_id 
-            FROM remnants WHERE 1=1
-        """
+        sql = "SELECT * FROM remnants WHERE 1=1"
         args = []
         
         if filter_type == 'mine':
@@ -51,25 +49,24 @@ async def get_remnants(request):
         rows = cursor.fetchall()
         
         results = []
-        # --- MUHIM: Har bir qatorni (r) indeks orqali lug'atga o'giramiz ---
         for r in rows:
+            # Endi r[0] emas, r['id'] ko'rinishida yozamiz
             results.append({
-                "id": r[0],
-                "category": str(r[1] if r[1] else ""),
-                "material": str(r[2] if r[2] else ""),
-                "width": int(r[3] if r[3] else 0),
-                "height": int(r[4] if r[4] else 0),
-                "qty": int(r[5] if r[5] else 0),
-                "origin_order": str(r[6] if r[6] else ""),
-                "location": str(r[7] if r[7] else ""),
-                "status": int(r[8] if r[8] else 1),
-                "user_id": str(r[9] if r[9] else "") # created_by_user_id
+                "id": r['id'],
+                "category": str(r['category'] or ""),
+                "material": str(r['material'] or ""),
+                "width": int(r['width'] or 0),
+                "height": int(r['height'] or 0),
+                "qty": int(r['qty'] or 0),
+                "origin_order": str(r['origin_order'] or ""),
+                "location": str(r['location'] or ""),
+                "status": int(r['status'] or 1),
+                "user_id": str(r['created_by_user_id'] or "")
             })
         
         return web.json_response(results)
     except Exception as e:
         logger.error(f"FATAL API ERROR: {str(e)}")
-        # Xatolikni aniq ko'rish uchun 500 qaytaramiz
         return web.json_response({"error": str(e)}, status=500)
     finally:
         if conn:
