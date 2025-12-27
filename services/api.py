@@ -95,16 +95,25 @@ async def get_categories(request):
 async def use_remnant(request):
     try:
         data = await request.json()
+        # 1. Bazada yangilash
         conn = db.get_db_connection()
         cur = conn.cursor()
         cur.execute("UPDATE remnants SET status=0, used_by_user_id=%s, used_at=NOW() WHERE id=%s", 
                    (data['user_id'], data['id']))
         conn.commit()
         conn.close()
+
+        # 2. Sheetda ham N-Q ustunlarini to'ldirish
+        try:
+            from services.gsheets import mark_as_used_in_sheet
+            # Mini appdan user_name va order_for ma'lumotlarini ham yuborish kerak
+            mark_as_used_in_sheet(data['id'], data['user_id'], data.get('user_name', 'Noma\'lum'), data.get('order_for', '-'))
+        except: pass
+
         return web.json_response({'status': 'ok'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
-
+        
 # --- 4. Qo'shish ---
 async def add_remnant(request):
     try:
