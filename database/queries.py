@@ -177,16 +177,23 @@ def sync_remnant_from_sheet(row):
     if not conn: return
     cursor = conn.cursor()
     try:
-        # 1. Ma'lumotlarni tozalash (A dan Q gacha jami 17 ta)
+        # 1. Ma'lumotlarni tozalash va listga o'tkazish
         r = [str(x).strip() if (x is not None and x != "") else None for x in row]
         while len(r) < 17: r.append(None)
 
-        # 2. ID ni tekshirish
+        # 2. ID ni tekshirish (A ustun)
         raw_id = r[0].replace('#', '') if r[0] else None
         if not raw_id or not raw_id.isdigit():
-            return # Sarlavha bo'lsa o'tib ketadi
+            return 
 
-        # 3. SQL UPSERT (Hamma 17 ta ustun bilan)
+        # 3. MA'LUMOT TURLARINI XAVFSIZ O'GIRISH (Safe Casting)
+        def to_int(val):
+            try:
+                if not val: return None
+                return int(float(str(val).replace(',', '.')))
+            except: return None
+
+        # SQL so'rovi (A-Q)
         query = """
             INSERT INTO remnants (
                 id, category, material, width, height, qty, origin_order, location, 
@@ -214,17 +221,28 @@ def sync_remnant_from_sheet(row):
                 used_at = EXCLUDED.used_at,
                 updated_at = NOW();
         """
-        
-        # Sonlarni xavfsiz o'tkazish
-        def to_int(val, default=0):
-            try: return int(float(str(val).replace(',', '.')))
-            except: return default
 
+        # Parametrlarni xavfsiz tayyorlash
+        # Sizning logingizda 'Zamin Baraka' matni son kutgan joyga kelgan
+        # Bu odatda r[10] (created_by_user_id) yoki r[13] (used_by_user_id) bo'ladi
         params = (
-            int(raw_id), r[1], r[2], 
-            to_int(r[3]), to_int(r[4]), to_int(r[5]), 
-            r[6], r[7], to_int(r[8], 1),
-            r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16]
+            int(raw_id),        # A: id
+            r[1],               # B: category
+            r[2],               # C: material
+            to_int(r[3]),       # D: width
+            to_int(r[4]),       # E: height
+            to_int(r[5]),       # F: qty
+            r[6],               # G: origin_order
+            r[7],               # H: location
+            to_int(r[8]) if r[8] else 1, # I: status
+            r[9],               # J: image_id (Text)
+            to_int(r[10]),      # K: created_by_user_id (Must be BIGINT)
+            r[11],              # L: created_by_name (Text)
+            r[12],              # M: created_at (Text)
+            to_int(r[13]),      # N: used_by_user_id (Must be BIGINT)
+            r[14],              # O: used_by_name (Text)
+            r[15],              # P: used_for_order (Text)
+            r[16]               # Q: used_at (Text)
         )
 
         cursor.execute(query, params)
