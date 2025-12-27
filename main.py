@@ -10,6 +10,16 @@ from services.api import (
 from bot.handlers import router as main_router
 from config import BOT_TOKEN
 
+@router.message(Command("sync"))
+async def cmd_sync(message: Message):
+    # Faqat adminlar uchun (ixtiyoriy)
+    await message.answer("🔄 Sinxronizatsiya boshlandi (A-Q)...")
+    try:
+        await full_sync_task()
+        await message.answer("✅ Baza Google Sheets bilan to'liq tenglashtirildi!")
+    except Exception as e:
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
 
 async def full_sync_task():
     logger.info("🔄 GSheets -> DB Sinxronizatsiya boshlandi (A-Q)...")
