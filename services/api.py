@@ -6,52 +6,77 @@ import logging
 
 logger = logging.getLogger(__name__)
 # --- 1. Qoldiqlarni olish (Indeksli mapping - Xato bermaydi) ---
+from aiohttp import web
+import database.queries as db
+from config import ADMIN_ID
+import logging
+
+logger = logging.getLogger(__name__)
+
 async def get_remnants(request):
     conn = None
     try:
-        user_id = request.rel_url.query.get('user_id')
-        filter_type = request.rel_url.query.get('type', 'all')
+        params = request.rel_url.query
+        user_id = params.get('user_id')
+        filter_type = params.get('type', 'all')
+        category = params.get('category')
         
         conn = db.get_db_connection()
         cursor = conn.cursor()
         
-        # Bazadagi haqiqiy ustun nomlari
-        sql = "SELECT id, category, material, width, height, qty, origin_order, location, status, created_by_user_id FROM remnants WHERE 1=1"
+        # SQL: Ustunlar tartibi remnants.json dagi bilan bir xil bo'lishi shart
+        sql = """
+            SELECT id, category, material, width, height, qty, 
+                   origin_order, location, status, created_by_user_id 
+            FROM remnants WHERE 1=1
+        """
+        args = []
         
         if filter_type == 'mine':
-            sql += f" AND created_by_user_id = {user_id}"
+            sql += " AND created_by_user_id = %s"
+            args.append(user_id)
         elif filter_type == 'used':
-            sql += f" AND status = 0 AND used_by_user_id = {user_id}"
+            sql += " AND status = 0 AND used_by_user_id = %s"
+            args.append(user_id)
         else:
             sql += " AND status = 1"
-            
-        sql += " ORDER BY id DESC"
-        cursor.execute(sql)
-        rows = cursor.fetchall()
 
+        if category and category != 'all':
+            sql += " AND category = %s"
+            args.append(category)
+
+        sql += " ORDER BY id DESC"
+        
+        cursor.execute(sql, args)
+        rows = cursor.fetchall()
+        
         results = []
+        # --- MUHIM: Har bir qatorni (r) indeks orqali lug'atga o'giramiz ---
         for r in rows:
-            # Rivojlangan tekshiruv: Ma'lumot borligiga ishonch hosil qilish
-            if len(r) >= 10:
-                results.append({
-                    "id": r[0],
-                    "category": str(r[1] or ""),
-                    "material": str(r[2] or ""),
-                    "width": int(r[3] or 0),
-                    "height": int(r[4] or 0),
-                    "qty": int(r[5] or 0),
-                    "order": str(r[6] or ""),
-                    "location": str(r[7] or ""),
-                    "status": int(r[8] or 1),
-                    "user_id": str(r[9] or "")
-                })
+            results.append({
+                "id": r[0],
+                "category": str(r[1] if r[1] else ""),
+                "material": str(r[2] if r[2] else ""),
+                "width": int(r[3] if r[3] else 0),
+                "height": int(r[4] if r[4] else 0),
+                "qty": int(r[5] if r[5] else 0),
+                "origin_order": str(r[6] if r[6] else ""),
+                "location": str(r[7] if r[7] else ""),
+                "status": int(r[8] if r[8] else 1),
+                "user_id": str(r[9] if r[9] else "") # created_by_user_id
+            })
         
         return web.json_response(results)
     except Exception as e:
-        logger.error(f"FATAL API ERROR: {e}")
+        logger.error(f"FATAL API ERROR: {str(e)}")
+        # Xatolikni aniq ko'rish uchun 500 qaytaramiz
         return web.json_response({"error": str(e)}, status=500)
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
+
+# Boshqa admin funksiyalar (use, edit, delete) o'zgarishsiz qolishi mumkin 
+# yoki xuddi shu indeksli mantiqqa o'tkazilishi kerak.
 
 # get_categories, add_remnant, edit_remnant funksiyalari o'zgarishsiz qolsin
 
