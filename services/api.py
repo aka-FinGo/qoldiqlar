@@ -13,9 +13,10 @@ async def get_remnants(request):
         category = params.get('category')
         
         conn = db.get_db_connection()
-        # Kursorni DictCursor yoki oddiy kursor sifatida ishlatishimizga qarab:
+        # Kursorni ochamiz
         cursor = conn.cursor()
         
+        # 1. SQL so'rovini tayyorlaymiz
         sql = """
             SELECT id, category, material, width, height, qty, 
                    origin_order, location, status, created_by_user_id 
@@ -38,26 +39,38 @@ async def get_remnants(request):
 
         sql += " ORDER BY id DESC"
         
+        # 2. So'rovni ijro etamiz
         cursor.execute(sql, args)
         
-        # --- MUHIM QISM: Lug'atni to'g'ri shakllantirish ---
+        # 3. Ustun nomlarini aniqlaymiz
         columns = [desc[0] for desc in cursor.description]
+        
+        # 4. Haqiqiy QATORLARNI olamiz (Bu yerda xato bo'lgan edi)
         rows = cursor.fetchall()
         
         results = []
         for row in rows:
-            # row - bu (36, 'LDSP', 'Oq', ...) shaklidagi tuple
-            # Biz uni columns bilan birlashtirib lug'at qilamiz
+            # zip(columns, row) orqali ustun nomi va qiymatni juftlaymiz
+            # Masalan: ('material', 'LDSP Oq')
             item = dict(zip(columns, row))
-            # Frontend user_id deb kutayotgani uchun:
+            
+            # Frontend user_id deb kutayotgani uchun uni ham qo'shib qo'yamiz
             item['user_id'] = item.get('created_by_user_id')
             results.append(item)
             
         conn.close()
+        
+        # Logga tekshirish uchun chiqarish (Render logsda ko'rinasiz)
+        import logging
+        logging.info(f"API javobi: {len(results)} ta qator topildi")
+        
         return web.json_response(results)
         
     except Exception as e:
+        import logging
+        logging.error(f"API ERROR: {str(e)}")
         return web.json_response({'error': str(e)}, status=500)
+
 
 
 async def get_categories(request):
