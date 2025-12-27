@@ -10,6 +10,30 @@ from services.api import (
 from bot.handlers import router as main_router
 from config import BOT_TOKEN
 
+
+async def full_sync_task():
+    logger.info("🔄 GSheets -> DB Sinxronizatsiya boshlandi (A-Q)...")
+    try:
+        # 1. Userlarni yangilash (avvalgidek qolsin)
+        users = get_all_users_from_sheet()
+        if users:
+            for u in users:
+                try: db.update_user_permission(u[0], 1 if str(u[3]).lower() in ['1','ha','true'] else 0)
+                except: continue
+        
+        # 2. Qoldiqlarni yangilash (A:Q)
+        # services/gsheets.py ichida get_all_remnants_from_sheet range'ni 'A2:Q' qiling
+        remnants = get_all_remnants_from_sheet() 
+        if remnants:
+            for row in remnants:
+                # Yangilangan funksiyani chaqiramiz
+                db.sync_remnant_from_sheet(row)
+        
+        logger.info("✅ To'liq sinxronizatsiya yakunlandi.")
+    except Exception as e:
+        logger.error(f"❌ Sync Error: {e}")
+        
+
 async def web_app_handler(request):
     try:
         with open('templates/index.html', 'r', encoding='utf-8') as f:
