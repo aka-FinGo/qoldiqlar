@@ -1,5 +1,55 @@
+import re
 from datetime import datetime
 from database.connection import get_db_connection
+
+def advanced_bot_search(query_text):
+    conn = get_db_connection()
+    if not conn: return []
+    cursor = conn.cursor() # DictCursor ishlatmasangiz, natija tuple bo'ladi
+    try:
+        # 1. Tozalash va statusni aniqlash
+        query_text = query_text.lower().strip()
+        is_used = "ishlatilgan" in query_text
+        status = 0 if is_used else 1
+        clean_text = query_text.replace("ishlatilgan", "").strip()
+
+        # 2. ID bo'yicha qidiruv (#75 yoki shunchaki 75)
+        if clean_text.startswith('#') or (clean_text.isdigit() and len(clean_text) < 6):
+            r_id = clean_text.replace('#', '')
+            cursor.execute("SELECT * FROM remnants WHERE id = %s", (int(r_id),))
+            return cursor.fetchall()
+
+        # 3. O'lchamlarni ajratib olish (Masalan: 200x500 yoki 200*500)
+        dimensions = re.findall(r'(\d+)\s*[x*×]\s*(\d+)', clean_text)
+        
+        sql = "SELECT * FROM remnants WHERE status = %s"
+        params = [status]
+
+        if dimensions:
+            w, h = dimensions[0]
+            # Eni va bo'yini aylantirib qidirish (200x500 so'rasa 500x200 ni ham topadi)
+            sql += " AND ((width >= %s AND height >= %s) OR (width >= %s AND height >= %s))"
+            params.extend([int(w), int(h), int(h), int(w)])
+            # O'lchamdan qolgan so'zlarni (rang, material) tozalash
+            clean_text = re.sub(r'(\d+)\s*[x*×]\s*(\d+)', '', clean_text).strip()
+
+        # 4. Qolgan so'zlar (Material yoki Kategoriya) bo'yicha qidiruv
+        if clean_text:
+            words = clean_text.split()
+            for word in words:
+                sql += " AND (material ILIKE %s OR category ILIKE %s OR origin_order ILIKE %s)"
+                params.extend([f"%{word}%", f"%{word}%", f"%{word}%"])
+
+        sql += " ORDER BY id DESC LIMIT 10"
+        cursor.execute(sql, params)
+        return cursor.fetchall()
+
+    except Exception as e:
+        print(f"❌ Search Error: {e}")
+        return []
+    finally:
+        conn.close()
+        
 
 def search_remnants(query_text):
     conn = get_db_connection()
