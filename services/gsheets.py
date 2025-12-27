@@ -48,6 +48,32 @@ def sync_new_remnant(data):
         print(f"✅ Sheetga qo'shildi: #{data.get('id')}")
     except Exception as e: 
         print(f"❌ Sheetga yozishda xato: {e}")
+        
+
+def mark_as_used_in_sheet(r_id, user_id, user_name, order_for):
+    """Qoldiq ishlatilganda Sheetdagi N-Q ustunlarini to'ldiradi"""
+    client = get_sheet_client()
+    if not client: return
+    try:
+        sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
+        # ID ustunidan (A) kerakli qatorni qidiramiz
+        cell = sheet.find(f"#{r_id}")
+        if cell:
+            row_num = cell.row
+            hozir = datetime.now().strftime("%d.%m.%Y %H:%M")
+            
+            # I: Statusni 0 (Ishlatilgan) qilish
+            sheet.update_cell(row_num, 9, 0) 
+            
+            # N, O, P, Q ustunlarini yangilash
+            updates = [
+                {'range': f'N{row_num}:Q{row_num}', 'values': [[str(user_id), user_name, order_for, hozir]]}
+            ]
+            sheet.batch_update(updates)
+            print(f"✅ Sheetda #{r_id} ishlatildi deb belgilandi.")
+    except Exception as e:
+        print(f"❌ Sheetni yangilashda xato (used): {e}")
+        
 
 def sync_new_user(user_id, full_name):
     """Yangi userni Ruxsatlar varag'iga yozish"""
