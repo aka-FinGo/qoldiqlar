@@ -1,5 +1,6 @@
 from datetime import datetime
 from database.connection import get_db_connection
+# --- 1. QOLDIQ QIDIRISH (MUKAMMAL QIDIRUV) ---
 
 def search_remnants(query_text):
     conn = get_db_connection()
