@@ -19,7 +19,7 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
     if message.text.startswith('/'): return
 
     db_user = db.get_or_create_user(message.from_user.id, message.from_user.full_name, message.from_user.username)
-    if not db_user or db_user.get('can_search') == 0:
+    if not db_user or db_user[1] == 0:
         return await message.answer(f"⛔️ Ruxsat yo'q. Admin: {ADMIN_USERNAME}")
 
     # AI Tahlil
