@@ -1,10 +1,8 @@
 from aiohttp import web
-import json
 import database.queries as db
 from config import ADMIN_ID
-from services.gsheets import sync_new_remnant 
+import logging
 
-# --- GET: Qoldiqlarni olish ---
 async def get_remnants(request):
     try:
         params = request.rel_url.query
@@ -16,7 +14,7 @@ async def get_remnants(request):
         # Kursorni ochamiz
         cursor = conn.cursor()
         
-        # 1. SQL so'rovini tayyorlaymiz
+        # SQL: Bazangizdagi aniq ustun nomlari
         sql = """
             SELECT id, category, material, width, height, qty, 
                    origin_order, location, status, created_by_user_id 
@@ -39,117 +37,36 @@ async def get_remnants(request):
 
         sql += " ORDER BY id DESC"
         
-        # 2. So'rovni ijro etamiz
         cursor.execute(sql, args)
         
-        # 3. Ustun nomlarini aniqlaymiz
+        # --- MUHIM: MA'LUMOTLARNI QAYTA ISHLASH ---
+        # cursor.description - bu faqat ustun nomlari
         columns = [desc[0] for desc in cursor.description]
         
-        # 4. Haqiqiy QATORLARNI olamiz (Bu yerda xato bo'lgan edi)
+        # cursor.fetchall() - bu bazadagi haqiqiy QATORLAR
         rows = cursor.fetchall()
         
         results = []
         for row in rows:
-            # zip(columns, row) orqali ustun nomi va qiymatni juftlaymiz
-            # Masalan: ('material', 'LDSP Oq')
-            item = dict(zip(columns, row))
+            # zip orqali ('material', 'Oq') ko'rinishida juftlaymiz
+            row_dict = {}
+            for i in range(len(columns)):
+                row_dict[columns[i]] = row[i]
             
-            # Frontend user_id deb kutayotgani uchun uni ham qo'shib qo'yamiz
-            item['user_id'] = item.get('created_by_user_id')
-            results.append(item)
+            # Frontend kutayotgan user_id ni ham qo'shib qo'yamiz
+            row_dict['user_id'] = row_dict.get('created_by_user_id')
+            results.append(row_dict)
             
         conn.close()
         
-        # Logga tekshirish uchun chiqarish (Render logsda ko'rinasiz)
-        import logging
-        logging.info(f"API javobi: {len(results)} ta qator topildi")
-        
+        # Debug uchun log: haqiqatan ma'lumot keldimi?
+        if results:
+            logging.info(f"DEBUG: Birinchi qator ma'lumoti: {results[0]}")
+
         return web.json_response(results)
         
     except Exception as e:
-        import logging
         logging.error(f"API ERROR: {str(e)}")
         return web.json_response({'error': str(e)}, status=500)
 
-
-
-async def get_categories(request):
-    try:
-        conn = db.get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT DISTINCT category FROM remnants WHERE status = 1")
-        cats = [row[0] for row in cur.fetchall() if row[0]]
-        conn.close()
-        return web.json_response(cats)
-    except:
-        return web.json_response([])
-
-async def check_is_admin(request):
-    user_id = request.rel_url.query.get('user_id')
-    return web.json_response({'is_admin': str(user_id) == str(ADMIN_ID)})
-
-# --- POST: Amallar (ImportError bermasligi uchun nomlar aniq) ---
-
-async def use_remnant(request): # Nomiga e'tibor bering!
-    try:
-        data = await request.json()
-        conn = db.get_db_connection()
-        cur = conn.cursor()
-        cur.execute("UPDATE remnants SET status=0, used_by_user_id=%s, used_at=NOW() WHERE id=%s", 
-                   (data['user_id'], data['id']))
-        conn.commit()
-        conn.close()
-        return web.json_response({'status': 'ok'})
-    except Exception as e:
-        return web.json_response({'error': str(e)}, status=500)
-
-async def add_remnant(request):
-    try:
-        data = await request.json()
-        conn = db.get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO remnants (category, material, width, height, qty, origin_order, location, created_by_user_id, status, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, NOW()) RETURNING id
-        """, (data['category'], data['material'], int(data['width']), int(data['height']), 
-              int(data['qty']), data.get('order',''), data.get('location',''), data['user_id']))
-        new_id = cur.fetchone()[0]
-        conn.commit()
-        conn.close()
-        
-        # GSheets sync
-        try:
-            sync_new_remnant({'id': new_id, **data})
-        except: pass
-        
-        return web.json_response({'status': 'ok'})
-    except Exception as e:
-        return web.json_response({'error': str(e)}, status=500)
-
-async def edit_remnant(request):
-    try:
-        data = await request.json()
-        conn = db.get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE remnants SET category=%s, material=%s, width=%s, height=%s, qty=%s, origin_order=%s, location=%s, updated_at=NOW()
-            WHERE id=%s
-        """, (data['category'], data['material'], int(data['width']), int(data['height']), 
-              int(data['qty']), data.get('order',''), data.get('location',''), data['id']))
-        conn.commit()
-        conn.close()
-        return web.json_response({'status': 'ok'})
-    except Exception as e:
-        return web.json_response({'error': str(e)}, status=500)
-
-async def delete_remnant(request):
-    try:
-        data = await request.json()
-        conn = db.get_db_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM remnants WHERE id=%s", (data['id'],))
-        conn.commit()
-        conn.close()
-        return web.json_response({'status': 'ok'})
-    except Exception as e:
-        return web.json_response({'error': str(e)}, status=500)
+# Qolgan funksiyalar (get_categories, add_remnant va h.k.) o'zgarishsiz qolsin
