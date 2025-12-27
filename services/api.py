@@ -5,7 +5,6 @@ from services.gsheets import sync_new_remnant
 import logging
 
 logger = logging.getLogger(__name__)
-
 # --- 1. Qoldiqlarni olish (Indeksli mapping - Xato bermaydi) ---
 async def get_remnants(request):
     conn = None
@@ -18,7 +17,7 @@ async def get_remnants(request):
         conn = db.get_db_connection()
         cursor = conn.cursor()
         
-        # SQL: Aniq ustunlar tartibi
+        # SQL: Aniq ustunlar tartibi!
         sql = """
             SELECT id, category, material, width, height, qty, 
                    origin_order, location, status, created_by_user_id 
@@ -39,13 +38,12 @@ async def get_remnants(request):
             args.append(category)
 
         sql += " ORDER BY id DESC"
-        
         cursor.execute(sql, args)
         rows = cursor.fetchall()
         
         results = []
         for r in rows:
-            # r[0]=id, r[1]=category, r[2]=material, r[3]=width, r[4]=height, r[5]=qty...
+            # Tuple -> Dict (Zanjir shu yerda ulanadi)
             results.append({
                 "id": r[0],
                 "category": str(r[1] if r[1] else ""),
@@ -61,10 +59,12 @@ async def get_remnants(request):
         
         return web.json_response(results)
     except Exception as e:
-        logger.error(f"GET_REMNANTS ERROR: {str(e)}")
+        logger.error(f"API ERROR: {e}")
         return web.json_response({"error": str(e)}, status=500)
     finally:
         if conn: conn.close()
+
+# get_categories, add_remnant, edit_remnant funksiyalari o'zgarishsiz qolsin
 
 # --- 2. Kategoriyalar ---
 async def get_categories(request):
