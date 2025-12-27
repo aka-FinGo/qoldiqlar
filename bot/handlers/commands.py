@@ -76,28 +76,19 @@ async def run_background_sync(message):
         # 1. Userlarni yangilash
         users = get_all_users_from_sheet()
         for row in users:
-            try: db.update_user_permission(row[0], 1 if str(row[2]).lower() in ['1', 'true', 'ha', 'bor'] else 0)
+            try: 
+                # A=0 (UserID), B=1, C=2, D=3 (Status) - main.py dagi kabi
+                u_id = int(str(row[0]).strip())
+                u_status = 1 if str(row[3]).lower() in ['1', 'true', 'ha', 'bor', 'yes'] else 0
+                db.update_user_permission(u_id, u_status)
             except: continue
             
         # 2. Qoldiqlarni yangilash
         remnants = get_all_remnants_from_sheet()
         for r in remnants:
             try:
-                # DIQQAT: Indekslar Sheetdagi ustunlarga moslandi (A=0)
-                # r[7] -> H ustuni (Buyurtma raqami)
-                # r[10] -> K ustuni (Lokatsiya)
-                # r[11] -> L ustuni (Status)
-                
-                db.sync_remnant_from_sheet(
-                    r[0],      # ID
-                    r[3],      # Material
-                    int(r[4]), # Bo'yi
-                    int(r[5]), # Eni
-                    int(r[6]), # Soni
-                    r[7],      # <--- TUZATILDI: H ustuni (Buyurtma)
-                    r[10],     # Lokatsiya
-                    int(r[11]) # Status
-                )
+                # sync_remnant_from_sheet funksiyasi butun row ni kutadi
+                db.sync_remnant_from_sheet(r)
             except Exception as e: 
                 print(f"Sync error row: {e}")
                 continue
