@@ -91,37 +91,42 @@ async function loadCategories() {
 }
 
 // --- RENDER ---
+// renderGrid funksiyasini shunga almashtiring
 function renderGrid(data, containerId) {
     const container = document.getElementById(containerId);
-    if (!container || !Array.isArray(data)) return;
+    if (!container) return;
     container.innerHTML = '';
+
+    if (!Array.isArray(data) || data.length === 0) {
+        document.getElementById('emptyState').classList.remove('hidden');
+        return;
+    }
 
     data.forEach(item => {
         const el = document.createElement('div');
         el.className = `card p-0 active:scale-95 transition-transform overflow-hidden flex flex-col`;
         el.onclick = () => openDetail(item);
         
-        // Bazadan kelayotgan nomlarni tekshirib olamiz
+        // Ma'lumotlarni o'qish
         const material = item.material || 'Nomaʼlum';
         const category = item.category || 'MDF';
-        const width = item.width || 0;
-        const height = item.height || 0;
-        const qty = item.qty || 0;
+        const size = `${item.width || 0} x ${item.height || 0}`;
 
         el.innerHTML = `
-            <div class="bg-gray-100 h-32 flex items-center justify-center text-gray-300">
+            <div class="bg-blue-50 h-32 flex items-center justify-center text-blue-200">
                 <i class="fas fa-layer-group text-4xl"></i>
             </div>
             <div class="p-3">
-                <span class="text-[10px] text-blue-500 font-bold uppercase border px-1 rounded">${category}</span>
+                <span class="text-[10px] text-blue-600 font-bold uppercase border px-1 rounded">${category}</span>
                 <h3 class="font-bold text-sm text-gray-800 mt-1 line-clamp-1">${material}</h3>
-                <div class="font-extrabold text-lg mt-1">${width} x ${height}</div>
-                <div class="text-xs text-gray-500">${qty} dona</div>
+                <div class="font-extrabold text-lg mt-1 text-gray-900">${size}</div>
+                <div class="text-xs text-gray-500 font-bold">${item.qty || 0} dona</div>
             </div>
         `;
         container.appendChild(el);
     });
 }
+
 
 
 
