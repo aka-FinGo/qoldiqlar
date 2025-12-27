@@ -1,6 +1,5 @@
 from datetime import datetime
 from database.connection import get_db_connection
-# --- 1. QOLDIQ QIDIRISH (MUKAMMAL QIDIRUV) ---
 
 def search_remnants(query_text):
     conn = get_db_connection()
@@ -12,7 +11,7 @@ def search_remnants(query_text):
         clean_query = query_text.lower().replace("ishlatilgan", "").strip()
         search_param = f"%{clean_query}%"
         
-        # SQL so'rovida ustunlarni aniq ko'rsatamiz
+        # SQL: Aniq ustunlar tartibini belgilaymiz
         query = """
             SELECT id, category, material, width, height, qty, origin_order, location, status, created_by_user_id 
             FROM remnants 
@@ -21,9 +20,9 @@ def search_remnants(query_text):
             ORDER BY id DESC
         """
         cursor.execute(query, (search_param, search_param, search_param, status_filter))
-        return cursor.fetchall() # Bu tuple qaytaradi
+        return cursor.fetchall()
     except Exception as e:
-        print(f"❌ Qidiruv xatosi: {e}")
+        print(f"SQL Error: {e}")
         return []
     finally:
         conn.close()
