@@ -97,36 +97,33 @@ function renderGrid(data, containerId) {
     if (!container) return;
     container.innerHTML = '';
 
-    if (!Array.isArray(data) || data.length === 0) {
-        container.innerHTML = '<p class="text-center p-10 text-gray-400">Ma\'lumot yo\'q</p>';
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="text-center p-10 text-gray-400">Hech narsa topilmadi</div>';
         return;
     }
 
     data.forEach(item => {
         const el = document.createElement('div');
-        el.className = `card p-0 active:scale-95 transition-transform overflow-hidden flex flex-col`;
+        el.className = `card p-0 active:scale-95 transition-transform overflow-hidden flex flex-col shadow-sm border`;
         el.onclick = () => openDetail(item);
         
-        // Ma'lumotlarni o'qishda xatolikdan qochamiz
-        const material = item.material || 'Nomaʼlum';
-        const category = item.category || 'Qoldiq';
-        const size = `${item.width || 0} x ${item.height || 0}`;
-
         el.innerHTML = `
             <div class="bg-blue-50 h-32 flex items-center justify-center text-blue-200">
                 <i class="fas fa-layer-group text-4xl"></i>
             </div>
             <div class="p-3">
-                <span class="text-[10px] text-blue-600 font-bold uppercase border px-1 rounded">${category}</span>
-                <h3 class="font-bold text-sm text-gray-800 mt-1 line-clamp-1">${material}</h3>
-                <div class="font-extrabold text-lg mt-1 text-gray-900">${size}</div>
-                <div class="text-xs text-gray-500 font-bold">${item.qty || 0} dona</div>
+                <span class="text-[10px] text-blue-600 font-bold uppercase border px-1 rounded">${item.category}</span>
+                <h3 class="font-bold text-sm text-gray-800 mt-1 line-clamp-1">${item.material}</h3>
+                <div class="font-extrabold text-lg mt-1 text-gray-900">${item.width} x ${item.height}</div>
+                <div class="flex justify-between items-center mt-2">
+                    <span class="text-xs text-gray-500 font-bold">${item.qty} dona</span>
+                    <span class="text-[10px] text-gray-400">ID: ${item.id}</span>
+                </div>
             </div>
         `;
         container.appendChild(el);
     });
 }
-
 
 
 function filterCat(btn, cat) {
