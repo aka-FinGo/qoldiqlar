@@ -261,3 +261,34 @@ function openModal(id) {
     document.getElementById(id).classList.remove('hidden'); 
 }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+
+async function testAPIDirectly() {
+    const debugBox = document.getElementById('debugResult');
+    debugBox.classList.remove('hidden');
+    debugBox.innerText = "So'rov yuborilmoqda...";
+
+    try {
+        // user_id ni qo'lda yozib tekshiramiz (bazangizda bor ID)
+        const testId = 380004653; 
+        const response = await fetch(`/api/remnants?user_id=${testId}&type=all`);
+        
+        if (!response.ok) {
+            throw new Error(`Server xatosi: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            debugBox.innerText = "❌ API Xatosi: " + data.error;
+        } else if (Array.isArray(data)) {
+            debugBox.innerText = `✅ Muvaffaqiyatli!\nTopilgan qoldiqlar soni: ${data.length}\n\nBirinchi ma'lumot:\n` + JSON.stringify(data[0], null, 2);
+            console.log("To'liq ma'lumot:", data);
+        } else {
+            debugBox.innerText = "⚠️ Noma'lum format: " + JSON.stringify(data);
+        }
+    } catch (err) {
+        debugBox.innerText = "❌ Tarmoq xatosi: " + err.message;
+    }
+}
+
