@@ -115,28 +115,42 @@ async def use_remnant(request):
         return web.json_response({'error': str(e)}, status=500)
         
 # --- 4. Qo'shish ---
+# --- 4. Yangi qo'shish ---
 async def add_remnant(request):
     try:
         data = await request.json()
         conn = db.get_db_connection()
         cur = conn.cursor()
+        
+        # 1. Bazaga saqlash
         cur.execute("""
             INSERT INTO remnants (category, material, width, height, qty, origin_order, location, created_by_user_id, status, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, NOW()) RETURNING id
         """, (data['category'], data['material'], int(data['width']), int(data['height']), 
               int(data['qty']), data.get('order',''), data.get('location',''), data['user_id']))
+        
         new_id = cur.fetchone()[0]
         conn.commit()
+        cur.close()
         conn.close()
+
+        # 2. GSheets-ga yuborish (Sizdagi IndentationError shu yerda edi)
         try:
-    data['id'] = new_id  # <--- MANA SHU QATOR ID CHIQISHINI TA'MINLAYDI
-    sync_new_remnant(data)
-except Exception as e:
-    logger.error(f"GSheets error: {e}")
-        except: pass
-        return web.json_response({'status': 'ok'})
+            # Bazadan olingan yangi ID ni data obyektiga qo'shamiz
+            data['id'] = new_id  
+            sync_new_remnant(data)
+            logger.info(f"✅ Yangi qoldiq GSheets-ga qo'shildi: #{new_id}")
+        except Exception as e:
+            logger.error(f"❌ GSheets-ga yozishda xato: {str(e)}")
+            # GSheets-da xato bo'lsa ham foydalanuvchiga 'ok' qaytaramiz, 
+            # chunki bazaga yozib bo'lindi.
+
+        return web.json_response({'status': 'ok', 'id': new_id})
+
     except Exception as e:
+        logger.error(f"❌ ADD_REMNANT ERROR: {str(e)}")
         return web.json_response({'error': str(e)}, status=500)
+        
 
 # --- 5. Tahrirlash ---
 async def edit_remnant(request):
