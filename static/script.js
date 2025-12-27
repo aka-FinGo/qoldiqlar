@@ -98,7 +98,7 @@ function renderGrid(data, containerId) {
     container.innerHTML = '';
 
     if (!Array.isArray(data) || data.length === 0) {
-        document.getElementById('emptyState').classList.remove('hidden');
+        container.innerHTML = '<p class="text-center p-10 text-gray-400">Ma\'lumot yo\'q</p>';
         return;
     }
 
@@ -107,9 +107,9 @@ function renderGrid(data, containerId) {
         el.className = `card p-0 active:scale-95 transition-transform overflow-hidden flex flex-col`;
         el.onclick = () => openDetail(item);
         
-        // Ma'lumotlarni o'qish
+        // Ma'lumotlarni o'qishda xatolikdan qochamiz
         const material = item.material || 'Nomaʼlum';
-        const category = item.category || 'MDF';
+        const category = item.category || 'Qoldiq';
         const size = `${item.width || 0} x ${item.height || 0}`;
 
         el.innerHTML = `
@@ -126,7 +126,6 @@ function renderGrid(data, containerId) {
         container.appendChild(el);
     });
 }
-
 
 
 
