@@ -152,11 +152,22 @@ def update_user_permission(user_id, status):
     if not conn: return
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            "UPDATE users SET can_search = %s, can_add = %s WHERE user_id = %s",
-            (status, status, str(user_id))
-        )
+        # Agar user bazada bo'lsa yangilaydi, bo'lmasa qo'shadi
+        query = """
+            INSERT INTO users (user_id, can_search, can_add, can_edit, can_delete, can_checkout)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+            can_search = EXCLUDED.can_search,
+            can_add = EXCLUDED.can_add,
+            can_edit = EXCLUDED.can_edit,
+            can_delete = EXCLUDED.can_delete,
+            can_checkout = EXCLUDED.can_checkout;
+        """
+        # Hozircha hamma ruxsatni bir xil statusga o'tkazamiz
+        cursor.execute(query, (user_id, status, status, status, status, status))
         conn.commit()
+    except Exception as e:
+        print(f"❌ User permission error: {e}")
     finally:
         conn.close()
 
