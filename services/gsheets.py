@@ -13,38 +13,41 @@ def get_sheet_client():
         return None
 
 def sync_new_remnant(data):
-    """Yangi qoldiqni Sheetga skrinshot va J-Q tartibiga moslab yozish"""
+    """
+    Yangi qoldiqni Sheetga A-Q tartibiga moslab yozish.
+    Ma'lumotlar bazadagi va /sync funksiyasidagi tartib bilan bir xil.
+    """
     client = get_sheet_client()
     if not client: return
     try:
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
         hozirgi_vaqt = datetime.now().strftime("%d.%m.%Y %H:%M")
         
-        # Ustunlar tartibi (A-Q):
+        # A dan Q gacha (17 ta ustun) yangi tartib:
         row = [
-            f"#{data.get('id')}",           # A: ID
-            hozirgi_vaqt,                    # B: SANA
-            data.get('category'),           # C: Kategoriya
-            data.get('material'),           # D: Material
-            data.get('height'),             # E: Bo'yi
-            data.get('width'),              # F: Eni
-            data.get('qty'),                # G: Soni
-            data.get('order'),              # H: Buyurtma (Zakaz)
-            data.get('user_name'),          # I: Kim qo'shdi
-            str(data.get('user_id')),       # J: User ID
-            data.get('location'),           # K: Lokatsiya/Izoh
-            1,                              # L: Status (1-mavjud)
-            "",                             # M: Rasm ID (bo'sh)
-            "",                             # N: Kim oldi
-            "",                             # O: Olingan sana
-            "",                             # P: Qaysi zakazga
-            ""                              # Q: Sabab
+            f"#{data.get('id')}",           # A: id
+            data.get('category'),           # B: category
+            data.get('material'),           # C: material
+            data.get('width'),              # D: width
+            data.get('height'),             # E: height
+            data.get('qty'),                # F: qty
+            data.get('order'),              # G: origin_order
+            data.get('location'),           # H: location
+            1,                              # I: status (1-mavjud)
+            "",                             # J: image_id
+            str(data.get('user_id')),       # K: created_by_user_id
+            data.get('user_name'),          # L: created_by_name
+            hozirgi_vaqt,                    # M: created_at
+            "",                             # N: used_by_user_id
+            "",                             # O: used_by_name
+            "",                             # P: used_for_order
+            ""                              # Q: used_at
         ]
-        sheet.append_row(row)
+        
+        sheet.append_row(row, value_input_option='USER_ENTERED')
         print(f"✅ Sheetga qo'shildi: #{data.get('id')}")
     except Exception as e: 
         print(f"❌ Sheetga yozishda xato: {e}")
-
 
 def sync_new_user(user_id, full_name):
     """Yangi userni Ruxsatlar varag'iga yozish"""
