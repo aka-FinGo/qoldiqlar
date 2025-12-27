@@ -60,18 +60,6 @@ async def main():
     await start_web_server()
     
     # Render uchun self-ping (ixtiyoriy)
-	# --- 2. SELF-PING (RENDER UCHUN) ---
-async def self_ping():
-    app_url = "https://qoldiqlar.onrender.com/" # O'zingizning Render URLingiz
-    while True:
-        await asyncio.sleep(600) # 10 daqiqa
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(app_url) as resp:
-                    logger.info(f"🛰 Self-ping status: {resp.status}")
-        except Exception as e:
-            logger.error(f"🛰 Self-ping error: {e}")
-			
     # asyncio.create_task(self_ping())
 
     try:
