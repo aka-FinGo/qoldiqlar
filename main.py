@@ -73,7 +73,6 @@ async def self_ping():
             logger.error(f"🛰 Self-ping error: {e}")
 			
     # asyncio.create_task(self_ping())
-	asyncio.create_task(self_ping())
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)
