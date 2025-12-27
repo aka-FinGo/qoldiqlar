@@ -18,64 +18,84 @@ class AddState(StatesGroup):
 async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
     if message.text.startswith('/'): return
 
+    # 1. FOYDALANUVCHI RUXSATINI TEKSHIRISH
     db_user = db.get_or_create_user(message.from_user.id, message.from_user.full_name, message.from_user.username)
-    if not db_user or db_user[1] == 0:
-        return await message.answer(f"⛔️ Ruxsat yo'q. Admin: {ADMIN_USERNAME}")
+    
+    # Logdagi 'tuple' xatosini oldini olish uchun indeks orqali tekshiramiz
+    # db_user[3] - can_search ustuni (bazadagi tartibga qarab)
+    # Agar queries.py da SELECT * bo'lsa, can_search odatda 3-indeksda bo'ladi.
+    if not db_user or (len(db_user) > 3 and db_user[3] == 0):
+        return await message.answer(f"⛔️ Kechirasiz, sizga ruxsat berilmagan. Admin: {ADMIN_USERNAME}")
 
-    # AI Tahlil
+    # AI orqali matnni tahlil qilish
     ai_result = await analyze_message(message.text)
     
-    # Agar AI adashsa yoki bo'sh kelsa
     if not ai_result or ai_result.get('cmd') == 'error':
         ai_result = {"cmd": "search", "keywords": message.text.split()}
 
     cmd = ai_result.get('cmd')
     
-    # --- TUZATILGAN SEARCH BLOKI ---
+    # --- 🔍 QIDIRUV BLOKI ---
     if cmd == 'search':
-        keywords = ai_result.get('keywords', [])
-        min_w = ai_result.get('min_w', 0)
-        min_h = ai_result.get('min_h', 0)
-        
-        # 1. Agar AI keywords bermasa-yu, lekin oddiy query bo'lsa
-        if not keywords and ai_result.get('query'):
-            keywords = ai_result.get('query').split()
-
-        # 2. XATONI TUZATISH: 
-        # Agar o'lcham (min_w, min_h) topilgan bo'lsa, keywords ichidagi 
-        # raqamli so'zlarni (masalan "200", "500", "200x500") O'CHIRIB TASHLAYMIZ.
-        # Aks holda bot "LDSP 200" deb nom qidirishga tushadi.
-        if min_w > 0 or min_h > 0:
-            cleaned_keywords = []
-            for k in keywords:
-                # Agar so'zda raqam qatnashmagan bo'lsa (masalan "Oq", "MDF") olib qolamiz
-                if not any(char.isdigit() for char in k):
-                    cleaned_keywords.append(k)
-            keywords = cleaned_keywords
-
-        params = {
-            "keywords": keywords,
-            "min_w": min_w,
-            "min_h": min_h
-        }
-
-        results = perform_smart_search(params)
+        # Smart search funksiyasini chaqiramiz
+        results = perform_smart_search(message.text)
         
         if not results:
-            await message.answer(f"🤷‍♂️ '{message.text}' bo'yicha mos qoldiq topilmadi.")
-            return
+            return await message.answer("🔍 Hech narsa topilmadi. O'lcham yoki materialni aniqroq yozing.")
 
-        # Natija matni
-        header_text = " ".join(keywords) if keywords else "O'lcham"
-        text = f"🔍 <b>Topildi:</b> (Jami: {len(results)})\n"
-        if min_w:
-            text += f"📏 {min_w}x{min_h} mm (aylantirib ham)\n"
+        # Natijalarni formatlash (Tuple'dan chiroyli matnga)
+        response_text = "<b>🔍 Topilgan qoldiqlar:</b>\n\n"
+        for r in results:
+            # r[0]-id, r[1]-cat, r[2]-mat, r[3]-w, r[4]-h, r[5]-qty
+            status = "✅" if r[8] == 1 else "🔴"
+            response_text += (
+                f"🆔 <b>#{r[0]}</b> | {r[1]} {r[2]}\n"
+                f"📐 {r[3]}x{r[4]} | 📦 {r[5]} dona | {status}\n"
+                f"📍 {r[7] or '-'}\n"
+                f"-------------------\n"
+            )
         
-        text += format_search_results(results[:5], len(results), 0)
-        kb = get_search_keyboard("SMART_SEARCH", 0, len(results)) # Callback data soddalashtirildi
-        
-        await message.answer(text, reply_markup=kb, parse_mode="HTML")
+        # Agar natijalar ko'p bo'lsa, xabarni bo'lib yuborish
+        if len(response_text) > 4000:
+            for i in range(0, len(response_text), 4000):
+                await message.answer(response_text[i:i+4000], parse_mode="HTML")
+        else:
+            await message.answer(response_text, parse_mode="HTML")
 
+    # --- ➕ QO'SHISH BLOKI ---
+    elif cmd == 'add':
+        items = ai_result.get('items', [])
+        if not items:
+            return await message.answer("❌ Qoldiq ma'lumotlarini aniqlay olmadim.")
+
+        report = "🚀 <b>Yangi qoldiqlar bazaga va Sheetga qo'shildi:</b>\n\n"
+        for item in items:
+            # 1. Bazaga yozish va yangi ID ni olish
+            new_id = db.add_remnant_final(item, message.from_user.id, message.from_user.full_name)
+            
+            if new_id:
+                # 2. GSheetga yozish (ID bilan birga)
+                # Diqqat: tartib A-Q bo'lishi uchun data obyektini to'liq yuboramiz
+                sync_data = {
+                    'id': new_id,
+                    'category': item.get('category'),
+                    'material': item.get('material'),
+                    'width': item.get('width'),
+                    'height': item.get('height'),
+                    'qty': item.get('qty'),
+                    'order': item.get('order'),
+                    'location': item.get('location'),
+                    'user_id': message.from_user.id,
+                    'user_name': message.from_user.full_name
+                }
+                sync_new_remnant(sync_data)
+                
+                report += (f"✅ <b>#{new_id}</b> {item['category']} {item['material']}\n"
+                           f"📐 {item['width']}x{item['height']} | 📦 {item['qty']} dona\n\n")
+        
+        await message.answer(report, parse_mode="HTML")
+
+    
     # --- BATCH ADD (O'zgarishsiz) ---
     elif cmd == 'batch_add':
         items = ai_result.get('items', [])
