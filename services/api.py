@@ -9,34 +9,68 @@ import logging
 logger = logging.getLogger(__name__)
 
 # --- 1. GET: Qoldiqlarni olish (Kafolatlangan mantiq) ---
+from aiohttp import web
+import database.queries as db
+from config import ADMIN_ID
+import logging
+
 async def get_remnants(request):
     try:
+        params = request.rel_url.query
+        user_id = params.get('user_id')
+        filter_type = params.get('type', 'all')
+        category = params.get('category')
+        
         conn = db.get_db_connection()
         cursor = conn.cursor()
         
-        # Eng oddiy so'rov
-        cursor.execute("SELECT * FROM remnants LIMIT 1")
+        # Aniq ustunlar tartibi bilan so'rov
+        sql = """
+            SELECT id, category, material, width, height, qty, 
+                   origin_order, location, status, created_by_user_id 
+            FROM remnants WHERE 1=1
+        """
+        args = []
+        if filter_type == 'mine':
+            sql += " AND created_by_user_id = %s"
+            args.append(user_id)
+        elif filter_type == 'used':
+            sql += " AND status = 0 AND used_by_user_id = %s"
+            args.append(user_id)
+        else: # 'all'
+            sql += " AND status = 1"
+
+        if category and category != 'all':
+            sql += " AND category = %s"
+            args.append(category)
+
+        sql += " ORDER BY id DESC"
         
-        row = cursor.fetchone() # Bitta qatorni olamiz
-        desc = cursor.description # Ustun nomlari
-        
+        cursor.execute(sql, args)
+        rows = cursor.fetchall()
         conn.close()
 
-        # Debug ma'lumotini shakllantiramiz
-        debug_info = {
-            "database_raw_row": str(row), # Bazadan kelgan asl tuple
-            "database_columns": [d[0] for d in desc], # Ustun nomlari
-            "test_manual_mapping": {}
-        }
-
-        # Agar ma'lumot bo'lsa, qo'lda mapping qilamiz
-        if row and desc:
-            for i in range(len(desc)):
-                debug_info["test_manual_mapping"][desc[i][0]] = row[i]
-
-        return web.json_response(debug_info)
+        results = []
+        # --- QO'LDA MAPPING (Xato ehtimoli 0%) ---
+        for row in rows:
+            results.append({
+                "id": row[0],
+                "category": str(row[1]),
+                "material": str(row[2]),
+                "width": int(row[3]),
+                "height": int(row[4]),
+                "qty": int(row[5]),
+                "origin_order": str(row[6] if row[6] else ""),
+                "location": str(row[7] if row[7] else ""),
+                "status": int(row[8]),
+                "created_by_user_id": str(row[9]),
+                "user_id": str(row[9]) # Frontend uchun duplicate
+            })
+        
+        return web.json_response(results)
     except Exception as e:
-        return web.json_response({"debug_error": str(e)})
+        logging.error(f"API ERROR: {str(e)}")
+        return web.json_response({"error": str(e)}, status=500)
 
 
 # --- 2. GET: Kategoriyalarni olish ---
