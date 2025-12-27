@@ -13,31 +13,34 @@ def get_sheet_client():
         return None
 
 def sync_new_remnant(data):
-    """
-    Yangi qoldiqni Sheetga A-Q tartibiga moslab yozish.
-    Ma'lumotlar bazadagi va /sync funksiyasidagi tartib bilan bir xil.
-    """
+    """Yangi qoldiqni Sheetga A-Q tartibiga 100% moslab yozish"""
     client = get_sheet_client()
     if not client: return
     try:
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
         hozirgi_vaqt = datetime.now().strftime("%d.%m.%Y %H:%M")
         
-        # A dan Q gacha (17 ta ustun) yangi tartib:
+        # ID ni tekshiramiz (data ichida 'id' borligiga ishonch hosil qiling)
+        new_id = data.get('id')
+        if not new_id:
+            print("⚠️ Xato: ID topilmadi, Sheetga yozilmadi.")
+            return
+
+        # A-Q TARTIBI (17 TA USTUN):
         row = [
-            f"#{data.get('id')}",           # A: id
-            data.get('category'),           # B: category
-            data.get('material'),           # C: material
-            data.get('width'),              # D: width
-            data.get('height'),             # E: height
-            data.get('qty'),                # F: qty
-            data.get('order'),              # G: origin_order
-            data.get('location'),           # H: location
+            f"#{new_id}",                   # A: id (ID endi aniq chiqadi)
+            data.get('category', ''),       # B: category
+            data.get('material', ''),       # C: material
+            data.get('width', 0),           # D: width
+            data.get('height', 0),          # E: height
+            data.get('qty', 0),             # F: qty
+            data.get('order', ''),          # G: origin_order
+            data.get('location', ''),       # H: location
             1,                              # I: status (1-mavjud)
             "",                             # J: image_id
-            str(data.get('user_id')),       # K: created_by_user_id
-            data.get('user_name'),          # L: created_by_name
-            hozirgi_vaqt,                    # M: created_at
+            str(data.get('user_id', '')),   # K: created_by_user_id
+            data.get('user_name', ''),      # L: created_by_name
+            hozirgi_vaqt,                   # M: created_at
             "",                             # N: used_by_user_id
             "",                             # O: used_by_name
             "",                             # P: used_for_order
@@ -45,7 +48,7 @@ def sync_new_remnant(data):
         ]
         
         sheet.append_row(row, value_input_option='USER_ENTERED')
-        print(f"✅ Sheetga qo'shildi: #{data.get('id')}")
+        print(f"✅ Sheetga to'g'ri tartibda qo'shildi: #{new_id}")
     except Exception as e: 
         print(f"❌ Sheetga yozishda xato: {e}")
         
