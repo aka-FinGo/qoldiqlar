@@ -79,4 +79,5 @@ async def analyze_message(text):
             continue
 
     # Agar hamma modellar xato qilsa:
-    return {"cmd": "error"}
+    return None
+
