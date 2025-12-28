@@ -1,43 +1,45 @@
+import re
 from aiogram import Router, types, F, Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from services.ai_core import analyze_message
 import database.queries as db
-from config import ADMIN_ID, ADMIN_USERNAME
+from services.ai_core import analyze_message
 from services.gsheets import sync_new_remnant
-from .utils import format_search_results, get_search_keyboard
-from services.search_engine import perform_smart_search
+from config import ADMIN_USERNAME
 
 router = Router()
-
-class AddState(StatesGroup):
-    waiting_confirm = State()
 
 @router.message(F.text)
 async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
     if message.text.startswith('/'):
         return
 
-    user = db.get_or_create_user(
+    # 1️⃣ Foydalanuvchini olish / yaratish
+    db_user = db.get_or_create_user(
         message.from_user.id,
         message.from_user.full_name,
         message.from_user.username
     )
 
+    # 2️⃣ Ruxsat tekshirish (DICT orqali!)
     if not db_user or db_user.get("can_add", 0) == 0:
-        return await message.answer(f"⛔️ Ruxsat yo‘q. Admin: {ADMIN_USERNAME}")
+        return await message.answer(
+            f"⛔️ Sizda qo‘shish ruxsati yo‘q.\nAdmin: {ADMIN_USERNAME}"
+        )
 
-    ai = await analyze_message(message.text)
+    text = message.text.strip()
 
-    # === 🔥 FALLBACK LOGIC ===
+    # 3️⃣ AI orqali tahlil
+    ai = await analyze_message(text)
+
+    # 4️⃣ 🔥 FALLBACK LOGIC (MUHIM)
     if not ai or ai.get("cmd") not in ["add", "batch_add"]:
-        if re.search(r'\d+\s*[x×*]\s*\d+', message.text):
+        # Agar o‘lchamga o‘xshash narsa bo‘lsa — ADD deb olamiz
+        if re.search(r'\d+\s*[x×*]\s*\d+', text):
             ai = {
                 "cmd": "add",
                 "items": [{
                     "category": "Boshqa",
-                    "material": message.text,
+                    "material": text,
                     "width": 0,
                     "height": 0,
                     "qty": 1,
@@ -45,7 +47,8 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
                     "location": ""
                 }]
         else:
-            return  # qidiruvga o‘tsin
+            # ADD ham emas — jim chiqib ketadi (search handler ishlaydi)
+            return
 
     items = ai.get("items", [])
     if not items:
@@ -53,8 +56,9 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
 
     report = "✅ <b>Qoldiq qo‘shildi:</b>\n\n"
 
+    # 5️⃣ Har bir itemni bazaga va Sheetga yozish
     for item in items:
-        # === NORMALIZATSIYA ===
+        # Normalizatsiya
         item["qty"] = int(item.get("qty") or 1)
         item["order"] = item.get("order") or item.get("origin_order") or ""
         item["location"] = item.get("location") or "Sex"
@@ -74,7 +78,7 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
             })
 
             report += (
-                f"🆔 #{new_id}\n"
+                f"🆔 <b>#{new_id}</b>\n"
                 f"📐 {item.get('width')}x{item.get('height')} | "
                 f"📦 {item.get('qty')} ta\n"
                 f"📍 {item.get('location')}\n\n"
