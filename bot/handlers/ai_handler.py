@@ -13,14 +13,14 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
     if message.text.startswith('/'):
         return
 
-    # 1️⃣ Foydalanuvchini olish / yaratish
+    # 1. Userni olish yoki yaratish
     db_user = db.get_or_create_user(
         message.from_user.id,
         message.from_user.full_name,
         message.from_user.username
     )
 
-    # 2️⃣ Ruxsat tekshirish (DICT orqali!)
+    # 2. Ruxsat tekshiruvi (DICT!)
     if not db_user or db_user.get("can_add", 0) == 0:
         return await message.answer(
             f"⛔️ Sizda qo‘shish ruxsati yo‘q.\nAdmin: {ADMIN_USERNAME}"
@@ -28,27 +28,28 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
 
     text = message.text.strip()
 
-    # 3️⃣ AI orqali tahlil
+    # 3. AI tahlil
     ai = await analyze_message(text)
 
-    # 4️⃣ 🔥 FALLBACK LOGIC (MUHIM)
+    # 4. FALLBACK (AI xato qilsa ham ADD ishlaydi)
     if not ai or ai.get("cmd") not in ["add", "batch_add"]:
-        # Agar o‘lchamga o‘xshash narsa bo‘lsa — ADD deb olamiz
         if re.search(r'\d+\s*[x×*]\s*\d+', text):
             ai = {
                 "cmd": "add",
-                "items": [{
-                    "category": "Boshqa",
-                    "material": text,
-                    "width": 0,
-                    "height": 0,
-                    "qty": 1,
-                    "order": "",
-                    "location": ""
-                }]
+                "items": [
+                    {
+                        "category": "Boshqa",
+                        "material": text,
+                        "width": 0,
+                        "height": 0,
+                        "qty": 1,
+                        "order": "",
+                        "location": ""
+                    }
+                ]
+            }
         else:
-            # ADD ham emas — jim chiqib ketadi (search handler ishlaydi)
-            return
+            return  # search handler ishlaydi
 
     items = ai.get("items", [])
     if not items:
@@ -56,9 +57,8 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
 
     report = "✅ <b>Qoldiq qo‘shildi:</b>\n\n"
 
-    # 5️⃣ Har bir itemni bazaga va Sheetga yozish
+    # 5. Bazaga va Sheetga yozish
     for item in items:
-        # Normalizatsiya
         item["qty"] = int(item.get("qty") or 1)
         item["order"] = item.get("order") or item.get("origin_order") or ""
         item["location"] = item.get("location") or "Sex"
@@ -85,7 +85,6 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
             )
 
     await message.answer(report, parse_mode="HTML")
-
     # --- ➕ QO'SHISH BLOKI ---
     elif cmd == 'add':
         items = ai_result.get('items', [])
