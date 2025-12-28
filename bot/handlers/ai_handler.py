@@ -16,51 +16,71 @@ class AddState(StatesGroup):
 
 @router.message(F.text)
 async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
-    if message.text.startswith('/'): return
+    if message.text.startswith('/'):
+        return
 
-    # 1. FOYDALANUVCHI RUXSATINI TEKSHIRISH
-    db_user = db.get_or_create_user(message.from_user.id, message.from_user.full_name, message.from_user.username)
-    
-    # Logdagi 'tuple' xatosini oldini olish uchun indeks orqali tekshiramiz
-    # db_user[3] - can_search ustuni (bazadagi tartibga qarab)
-    # Agar queries.py da SELECT * bo'lsa, can_search odatda 3-indeksda bo'ladi.
-    if not db_user or (len(db_user) > 3 and db_user[3] == 0):
-        return await message.answer(f"⛔️ Kechirasiz, sizga ruxsat berilmagan. Admin: {ADMIN_USERNAME}")
+    user = db.get_or_create_user(
+        message.from_user.id,
+        message.from_user.full_name,
+        message.from_user.username
+    )
 
-    # AI orqali matnni tahlil qilish
-    ai_result = await analyze_message(message.text)
-    
-    if not ai_result or ai_result.get('cmd') == 'error':
-        ai_result = {"cmd": "search", "keywords": message.text.split()}
+    if not user or user.get("can_add", 0) == 0:
+        return await message.answer(f"⛔️ Ruxsat yo‘q. Admin: {ADMIN_USERNAME}")
 
-    cmd = ai_result.get('cmd')
-    
-    # --- 🔍 QIDIRUV BLOKI ---
-    if cmd == 'search':
-        # Smart search funksiyasini chaqiramiz
-        results = perform_smart_search(message.text)
-        
-        if not results:
-            return await message.answer("🔍 Hech narsa topilmadi. O'lcham yoki materialni aniqroq yozing.")
+    ai = await analyze_message(message.text)
 
-        # Natijalarni formatlash (Tuple'dan chiroyli matnga)
-        response_text = "<b>🔍 Topilgan qoldiqlar:</b>\n\n"
-        for r in results:
-            # r[0]-id, r[1]-cat, r[2]-mat, r[3]-w, r[4]-h, r[5]-qty
-            status = "✅" if r[8] == 1 else "🔴"
-            response_text += (
-                f"🆔 <b>#{r[0]}</b> | {r[1]} {r[2]}\n"
-                f"📐 {r[3]}x{r[4]} | 📦 {r[5]} dona | {status}\n"
-                f"📍 {r[7] or '-'}\n"
-                f"-------------------\n"
-            )
-        
-        # Agar natijalar ko'p bo'lsa, xabarni bo'lib yuborish
-        if len(response_text) > 4000:
-            for i in range(0, len(response_text), 4000):
-                await message.answer(response_text[i:i+4000], parse_mode="HTML")
+    # === 🔥 FALLBACK LOGIC ===
+    if not ai or ai.get("cmd") not in ["add", "batch_add"]:
+        if re.search(r'\d+\s*[x×*]\s*\d+', message.text):
+            ai = {
+                "cmd": "add",
+                "items": [{
+                    "category": "Boshqa",
+                    "material": message.text,
+                    "width": 0,
+                    "height": 0,
+                    "qty": 1,
+                    "order": "",
+                    "location": ""
+                }]
         else:
-            await message.answer(response_text, parse_mode="HTML")
+            return  # qidiruvga o‘tsin
+
+    items = ai.get("items", [])
+    if not items:
+        return await message.answer("❌ Qo‘shish uchun ma’lumot topilmadi.")
+
+    report = "✅ <b>Qoldiq qo‘shildi:</b>\n\n"
+
+    for item in items:
+        # === NORMALIZATSIYA ===
+        item["qty"] = int(item.get("qty") or 1)
+        item["order"] = item.get("order") or item.get("origin_order") or ""
+        item["location"] = item.get("location") or "Sex"
+
+        new_id = db.add_remnant_final(
+            item,
+            message.from_user.id,
+            message.from_user.full_name
+        )
+
+        if new_id:
+            sync_new_remnant({
+                "id": new_id,
+                **item,
+                "user_id": message.from_user.id,
+                "user_name": message.from_user.full_name
+            })
+
+            report += (
+                f"🆔 #{new_id}\n"
+                f"📐 {item.get('width')}x{item.get('height')} | "
+                f"📦 {item.get('qty')} ta\n"
+                f"📍 {item.get('location')}\n\n"
+            )
+
+    await message.answer(report, parse_mode="HTML")
 
     # --- ➕ QO'SHISH BLOKI ---
     elif cmd == 'add':
