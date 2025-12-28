@@ -25,7 +25,7 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
         message.from_user.username
     )
 
-    if not user or user.get("can_add", 0) == 0:
+    if not db_user or db_user.get("can_add", 0) == 0:
         return await message.answer(f"⛔️ Ruxsat yo‘q. Admin: {ADMIN_USERNAME}")
 
     ai = await analyze_message(message.text)
