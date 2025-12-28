@@ -1,104 +1,74 @@
-import re
 from aiogram import Router, types, F, Bot
 from aiogram.fsm.context import FSMContext
-import database.queries as db
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from services.ai_core import analyze_message
+import database.queries as db
+from config import ADMIN_ID, ADMIN_USERNAME
 from services.gsheets import sync_new_remnant
-from config import ADMIN_USERNAME
+from services.search_engine import perform_smart_search
 
 router = Router()
 
+class AddState(StatesGroup):
+    waiting_confirm = State()
+
 @router.message(F.text)
 async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
-    if message.text.startswith('/'):
+    if message.text.startswith('/'): 
         return
 
-    # 1. Userni olish yoki yaratish
-    db_user = db.get_or_create_user(
-        message.from_user.id,
-        message.from_user.full_name,
-        message.from_user.username
-    )
+    # 1. Foydalanuvchi ruxsatini tekshirish
+    db_user = db.get_or_create_user(message.from_user.id, message.from_user.full_name, message.from_user.username)
+    
+    # db_user tuple bo'lsa, indeks orqali ruxsatni tekshiramiz
+    if not db_user or (len(db_user) > 3 and db_user[3] == 0):
+        return await message.answer(f"⛔️ Kechirasiz, sizga ruxsat berilmagan. Admin: {ADMIN_USERNAME}")
 
-    # 2. Ruxsat tekshiruvi (DICT!)
-    if not db_user or db_user.get("can_add", 0) == 0:
-        return await message.answer(
-            f"⛔️ Sizda qo‘shish ruxsati yo‘q.\nAdmin: {ADMIN_USERNAME}"
-        )
+    # AI tahlil
+    ai_result = await analyze_message(message.text)
+    
+    if not ai_result or ai_result.get('cmd') == 'error':
+        ai_result = {"cmd": "search", "keywords": message.text.split()}
 
-    text = message.text.strip()
+    cmd = ai_result.get('cmd')
+    
+    # --- 🔍 QIDIRUV BLOKI ---
+    if cmd == 'search':
+        results = perform_smart_search(message.text)
+        
+        if not results:
+            return await message.answer("🔍 Hech narsa topilmadi. O'lcham yoki materialni aniqroq yozing.")
 
-    # 3. AI tahlil
-    ai = await analyze_message(text)
-
-    # 4. FALLBACK (AI xato qilsa ham ADD ishlaydi)
-    if not ai or ai.get("cmd") not in ["add", "batch_add"]:
-        if re.search(r'\d+\s*[x×*]\s*\d+', text):
-            ai = {
-                "cmd": "add",
-                "items": [
-                    {
-                        "category": "Boshqa",
-                        "material": text,
-                        "width": 0,
-                        "height": 0,
-                        "qty": 1,
-                        "order": "",
-                        "location": ""
-                    }
-                ]
-            }
-        else:
-            return  # search handler ishlaydi
-
-    items = ai.get("items", [])
-    if not items:
-        return await message.answer("❌ Qo‘shish uchun ma’lumot topilmadi.")
-
-    report = "✅ <b>Qoldiq qo‘shildi:</b>\n\n"
-
-    # 5. Bazaga va Sheetga yozish
-    for item in items:
-        item["qty"] = int(item.get("qty") or 1)
-        item["order"] = item.get("order") or item.get("origin_order") or ""
-        item["location"] = item.get("location") or "Sex"
-
-        new_id = db.add_remnant_final(
-            item,
-            message.from_user.id,
-            message.from_user.full_name
-        )
-
-        if new_id:
-            sync_new_remnant({
-                "id": new_id,
-                **item,
-                "user_id": message.from_user.id,
-                "user_name": message.from_user.full_name
-            })
-
-            report += (
-                f"🆔 <b>#{new_id}</b>\n"
-                f"📐 {item.get('width')}x{item.get('height')} | "
-                f"📦 {item.get('qty')} ta\n"
-                f"📍 {item.get('location')}\n\n"
+        response_text = "<b>🔍 Topilgan qoldiqlar:</b>\n\n"
+        for r in results:
+            status = "✅" if r[8] == 1 else "🔴"
+            response_text += (
+                f"🆔 <b>#{r[0]}</b> | {r[1]} {r[2]}\n"
+                f"📐 {r[3]}x{r[4]} | 📦 {r[5]} dona | {status}\n"
+                f"📍 {r[7] or '-'}\n"
+                f"-------------------\n"
             )
+        
+        if len(response_text) > 4000:
+            for i in range(0, len(response_text), 4000):
+                await message.answer(response_text[i:i+4000], parse_mode="HTML")
+        else:
+            await message.answer(response_text, parse_mode="HTML")
 
-    await message.answer(report, parse_mode="HTML")
     # --- ➕ QO'SHISH BLOKI ---
-    elif cmd == 'add':
+    elif cmd == 'add' or cmd == 'batch_add':
         items = ai_result.get('items', [])
         if not items:
             return await message.answer("❌ Qoldiq ma'lumotlarini aniqlay olmadim.")
 
         report = "🚀 <b>Yangi qoldiqlar bazaga va Sheetga qo'shildi:</b>\n\n"
         for item in items:
-            # 1. Bazaga yozish va yangi ID ni olish
+            # Bazaga yozish va ID olish
             new_id = db.add_remnant_final(item, message.from_user.id, message.from_user.full_name)
             
             if new_id:
-                # 2. GSheetga yozish (ID bilan birga)
-                # Diqqat: tartib A-Q bo'lishi uchun data obyektini to'liq yuboramiz
+                # GSheetga yozish (A-Q tartibiga mos)
                 sync_data = {
                     'id': new_id,
                     'category': item.get('category'),
@@ -116,7 +86,13 @@ async def handle_text(message: types.Message, state: FSMContext, bot: Bot):
                 report += (f"✅ <b>#{new_id}</b> {item['category']} {item['material']}\n"
                            f"📐 {item['width']}x{item['height']} | 📦 {item['qty']} dona\n\n")
         
-        await message.answer(report, parse_mode="HTML")
+        if report != "🚀 <b>Yangi qoldiqlar bazaga va Sheetga qo'shildi:</b>\n\n":
+            await message.answer(report, parse_mode="HTML")
+        else:
+            await message.answer("❌ Saqlashda xatolik yuz berdi.")
+    
+    else:
+        await message.answer("❓ Buyruq tushunarsiz. Qidirish uchun 'oq 200x500' kabi yozing.")
 
     
     # --- BATCH ADD (O'zgarishsiz) ---
